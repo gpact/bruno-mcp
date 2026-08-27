@@ -30,7 +30,7 @@ export {
 export type ToolRegistrar = (server: McpServer, config: Config) => void;
 
 /**
- * Append-only list of tool registrars — one entry per tool module. Each tool
+ * Append-only list of tool registrars: one entry per tool module. Each tool
  * issue plugs in by adding its registrar here. Keeping this
  * flat and append-only lets parallel tool branches extend the surface without
  * colliding on shared registry logic.
