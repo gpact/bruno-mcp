@@ -23,6 +23,7 @@ import { RUN_TOOL_NAME, registerRun } from "./run.js";
 export {
   toToolErrorResult,
   runTool,
+  jsonResult,
   notImplementedResult,
 } from "./result.js";
 

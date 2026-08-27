@@ -54,6 +54,20 @@ export async function runTool(
   }
 }
 
+/**
+ * Build a successful tool result from a structured payload.
+ *
+ * The payload is returned twice: as pretty-printed JSON text (so clients that
+ * only read `content` still see it) and as machine-readable `structuredContent`
+ * that can be validated against a tool's advertised output schema.
+ */
+export function jsonResult(payload: Record<string, unknown>): CallToolResult {
+  return {
+    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+    structuredContent: payload,
+  };
+}
+
 /** Placeholder result for a tool whose behavior has not landed yet. */
 export function notImplementedResult(toolName: string): CallToolResult {
   return {
