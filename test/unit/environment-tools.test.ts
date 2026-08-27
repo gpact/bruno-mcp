@@ -110,7 +110,7 @@ async function call(
 }
 
 describe("environment tool registration", () => {
-  it("registers both environment tools with their descriptions and schemas", () => {
+  it("registers both environment tools with descriptions and input schemas", () => {
     const list = tool(LIST_ENVIRONMENTS_TOOL_NAME);
     const get = tool(GET_ENVIRONMENT_TOOL_NAME);
 
@@ -121,9 +121,12 @@ describe("environment tool registration", () => {
       "Inspect a Bruno environment. Variables marked as secrets are always redacted.",
     );
     expect(list.config.inputSchema).toBeDefined();
-    expect(list.config.outputSchema).toBeDefined();
     expect(get.config.inputSchema).toBeDefined();
-    expect(get.config.outputSchema).toBeDefined();
+  });
+
+  it("does not advertise an output schema, avoiding client-side output validation mismatches", () => {
+    expect(tool(LIST_ENVIRONMENTS_TOOL_NAME).config.outputSchema).toBeUndefined();
+    expect(tool(GET_ENVIRONMENT_TOOL_NAME).config.outputSchema).toBeUndefined();
   });
 });
 

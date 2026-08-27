@@ -19,19 +19,6 @@ const inputSchema = z.object({
     ),
 });
 
-const outputSchema = z.object({
-  name: z.string(),
-  variables: z
-    .array(
-      z.object({
-        name: z.string(),
-        value: z.string(),
-        secret: z.boolean(),
-      }),
-    )
-    .describe("Variables with secret values replaced by [REDACTED]."),
-});
-
 /** Parsed input for the `bruno_get_environment` tool. */
 export type GetEnvironmentInput = z.infer<typeof inputSchema>;
 
@@ -59,6 +46,9 @@ export function registerGetEnvironment(
   server: McpServer,
   config: Config,
 ): void {
+  // No output schema is advertised: the result is returned as structured
+  // content plus JSON text, which stays compatible with clients that validate
+  // or project tool output differently across MCP protocol revisions.
   server.registerTool(
     GET_ENVIRONMENT_TOOL_NAME,
     {
@@ -66,7 +56,6 @@ export function registerGetEnvironment(
       description:
         "Inspect a Bruno environment. Variables marked as secrets are always redacted.",
       inputSchema,
-      outputSchema,
     },
     (input) => runTool(() => handleGetEnvironment(config, input)),
   );

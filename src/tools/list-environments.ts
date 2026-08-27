@@ -14,19 +14,6 @@ const inputSchema = z.object({
     .describe("Collection identifier, relative to the configured workspace root."),
 });
 
-const outputSchema = z.object({
-  environments: z
-    .array(
-      z.object({
-        name: z.string(),
-        path: z.string(),
-        variableCount: z.number().int(),
-        secretCount: z.number().int(),
-      }),
-    )
-    .describe("Environment summaries. Variable values are never included."),
-});
-
 /** Parsed input for the `bruno_list_environments` tool. */
 export type ListEnvironmentsInput = z.infer<typeof inputSchema>;
 
@@ -49,6 +36,9 @@ export function registerListEnvironments(
   server: McpServer,
   config: Config,
 ): void {
+  // No output schema is advertised: the result is returned as structured
+  // content plus JSON text, which stays compatible with clients that validate
+  // or project tool output differently across MCP protocol revisions.
   server.registerTool(
     LIST_ENVIRONMENTS_TOOL_NAME,
     {
@@ -56,7 +46,6 @@ export function registerListEnvironments(
       description:
         "List environments available to a Bruno collection without exposing variable values.",
       inputSchema,
-      outputSchema,
     },
     (input) => runTool(() => handleListEnvironments(config, input)),
   );
