@@ -38,14 +38,10 @@ files rather than parsing or converting them.
 
 ## Installation
 
-The public npm package currently named `bruno-mcp` is a different project. From
-a checkout of this repository, install dependencies, build this server, and
-link its CLI entry point:
+Install Bruno MCP globally from npm:
 
 ```sh
-npm ci
-npm run build
-npm link
+npm install --global @gpact/bruno-mcp
 ```
 
 Install a supported Bruno CLI separately if it is not already available:
@@ -63,6 +59,14 @@ bru --version
 
 `bruno-mcp` has no command-line options, so invoking it starts the stdio server
 rather than printing help. MCP hosts normally start it for you.
+
+To install from a repository checkout instead:
+
+```sh
+npm ci
+npm run build
+npm link
+```
 
 ## MCP host configuration
 

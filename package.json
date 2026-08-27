@@ -1,5 +1,5 @@
 {
-  "name": "bruno-mcp",
+  "name": "@gpact/bruno-mcp",
   "version": "0.1.0",
   "description": "A local MCP server for Bruno v4 OpenCollection collections",
   "type": "module",
@@ -9,9 +9,13 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --mode integration",
