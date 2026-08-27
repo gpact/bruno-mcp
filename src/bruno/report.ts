@@ -103,6 +103,14 @@ const REPORT_PARSE_MESSAGE = "Bruno JSON reporter output could not be parsed.";
 /** Default maximum serialized size of one normalized response body (256 KiB). */
 export const DEFAULT_MAX_RESPONSE_BODY_BYTES = 262_144;
 
+/** Controls which normalized response bodies are included in MCP output. */
+export type ResponseBodyMode = "none" | "onFailure" | "full";
+
+export interface ResponseBodyOutputOptions {
+  readonly mode?: ResponseBodyMode;
+  readonly maxBodyBytes?: number;
+}
+
 /**
  * Reject raw reporter output whose UTF-8 byte length exceeds the configured
  * limit. The error includes sizes only and never includes reporter content.
@@ -133,20 +141,48 @@ function bodyByteLength(body: unknown): number {
   return serialized === undefined ? 0 : Buffer.byteLength(serialized, "utf8");
 }
 
+function hasFailedCheck(result: NormalizedRequestResult): boolean {
+  return result.tests.some((test) => test.status === "failed");
+}
+
 /**
- * Return a copy of a normalized report with oversized response bodies removed.
- * Explicit metadata records every removal and its original serialized byte size.
+ * Return a copy of a normalized report containing only the requested response
+ * bodies. Oversized included bodies are replaced by deterministic size metadata.
  */
-export function limitResponseBodies(
+export function filterResponseBodies(
   report: NormalizedBruReport,
-  maxBodyBytes = DEFAULT_MAX_RESPONSE_BODY_BYTES,
+  options: ResponseBodyOutputOptions = {},
 ): NormalizedBruReport {
   if (report.results === undefined) {
     return report;
   }
 
+  const mode = options.mode ?? "onFailure";
+  const maxBodyBytes =
+    options.maxBodyBytes ?? DEFAULT_MAX_RESPONSE_BODY_BYTES;
   let changed = false;
   const results = report.results.map((result) => {
+    const includeBody =
+      mode === "full" || (mode === "onFailure" && hasFailedCheck(result));
+    if (!includeBody) {
+      if (
+        !Object.hasOwn(result.response, "body") &&
+        result.response.bodyTruncated === undefined &&
+        result.response.originalBodyBytes === undefined
+      ) {
+        return result;
+      }
+
+      changed = true;
+      const {
+        body: _body,
+        bodyTruncated: _bodyTruncated,
+        originalBodyBytes: _originalBodyBytes,
+        ...response
+      } = result.response;
+      return { ...result, response };
+    }
+
     if (!Object.hasOwn(result.response, "body")) {
       return result;
     }

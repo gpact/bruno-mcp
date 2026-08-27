@@ -6,7 +6,7 @@ import { BrunoMcpError } from "../../src/bruno/errors.js";
 import {
   DEFAULT_MAX_RESPONSE_BODY_BYTES,
   assertReportSize,
-  limitResponseBodies,
+  filterResponseBodies,
   normalizeBruReport,
 } from "../../src/bruno/report.js";
 
@@ -274,7 +274,10 @@ describe("report output limits", () => {
       ]),
     });
 
-    const limited = limitResponseBodies(report, 10);
+    const limited = filterResponseBodies(report, {
+      mode: "full",
+      maxBodyBytes: 10,
+    });
 
     expect(limited.results?.[0]?.response).toEqual({
       status: 200,
@@ -306,9 +309,67 @@ describe("report output limits", () => {
       ]),
     });
 
-    expect(limitResponseBodies(report).results?.[0]?.response).toEqual({
+    expect(
+      filterResponseBodies(report, { mode: "full" }).results?.[0]?.response,
+    ).toEqual({
       bodyTruncated: true,
       originalBodyBytes: DEFAULT_MAX_RESPONSE_BODY_BYTES + 1,
     });
+  });
+
+  it("omits all response bodies in none mode", () => {
+    const report = normalizeBruReport({
+      exitCode: 1,
+      stderr: "",
+      reportRaw: JSON.stringify([
+        {
+          results: [
+            {
+              path: "Failure.yml",
+              response: { status: 200, data: { value: "actual" } },
+              assertionResults: [{ status: "fail" }],
+            },
+          ],
+        },
+      ]),
+    });
+
+    expect(
+      filterResponseBodies(report, { mode: "none" }).results?.[0]?.response,
+    ).toEqual({ status: 200 });
+  });
+
+  it("defaults to bodies for failed checks only", () => {
+    const report = normalizeBruReport({
+      exitCode: 1,
+      stderr: "",
+      reportRaw: JSON.stringify([
+        {
+          results: [
+            {
+              path: "Success.yml",
+              response: { status: 200, data: "success body" },
+              testResults: [{ status: "pass" }],
+            },
+            {
+              path: "Failure.yml",
+              response: { status: 200, data: "failure body" },
+              assertionResults: [{ status: "fail" }],
+            },
+          ],
+        },
+      ]),
+    });
+
+    const filtered = filterResponseBodies(report);
+
+    expect(filtered.results?.[0]?.response).toEqual({ status: 200 });
+    expect(filtered.results?.[1]?.response).toEqual({
+      status: 200,
+      body: "failure body",
+    });
+    expect(filtered.results?.[1]?.tests).toEqual([
+      { name: "Assertion", status: "failed" },
+    ]);
   });
 });

@@ -66,10 +66,11 @@ describe("runInputSchema", () => {
       testsOnly: false,
       sandbox: "safe",
       insecure: false,
+      responseBodyMode: "onFailure",
     });
   });
 
-  it("rejects invalid delays and non-string variable values", () => {
+  it("rejects invalid delays, variables, and response body options", () => {
     expect(() =>
       runInputSchema.parse({ collection: "example", delayMs: -1 }),
     ).toThrow();
@@ -77,6 +78,18 @@ describe("runInputSchema", () => {
       runInputSchema.parse({
         collection: "example",
         variables: { retries: 3 },
+      }),
+    ).toThrow();
+    expect(() =>
+      runInputSchema.parse({
+        collection: "example",
+        responseBodyMode: "errors",
+      }),
+    ).toThrow();
+    expect(() =>
+      runInputSchema.parse({
+        collection: "example",
+        maxResponseBodyBytes: 0,
       }),
     ).toThrow();
   });
@@ -139,6 +152,8 @@ describe("handleRun execution", () => {
         environment: "Local",
         variables: { locale: "en-US" },
         bail: true,
+        responseBodyMode: "full",
+        maxResponseBodyBytes: 1_024,
       }),
       { runProcess },
     );
@@ -189,6 +204,7 @@ describe("handleRun execution", () => {
               {
                 path: "Failure.yml",
                 status: "failed",
+                response: { status: 200, data: { value: "actual" } },
                 assertionResults: [
                   {
                     lhsExpr: "res.status",
@@ -210,6 +226,81 @@ describe("handleRun execution", () => {
       isError: false,
       execution: { status: "failed", exitCode: 1 },
       summary: { total: 1, passed: 0, failed: 1 },
+      results: [
+        {
+          response: { status: 200, body: { value: "actual" } },
+          tests: [
+            {
+              status: "failed",
+              error: "expected 200 to equal 201",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("omits successful bodies by default without changing result details", async () => {
+    const runProcess: RunProcess = async () =>
+      processResult({ reportRaw: reportWithBody({ value: "large payload" }) });
+
+    const result = await handleRun(baseConfig, input(), { runProcess });
+
+    expect(result.structuredContent).toMatchObject({
+      execution: { status: "passed", exitCode: 0 },
+      summary: { total: 1, passed: 1, failed: 0 },
+      results: [
+        {
+          response: { status: 200 },
+          tests: [{ name: "returns 200", status: "passed" }],
+        },
+      ],
+    });
+    expect(
+      (result.structuredContent?.results as { response: unknown }[])[0]
+        ?.response,
+    ).toEqual({ status: 200 });
+  });
+
+  it("supports suppressing failed bodies and limiting full output", async () => {
+    const runProcess: RunProcess = async () =>
+      processResult({
+        exitCode: 1,
+        reportRaw: JSON.stringify([
+          {
+            results: [
+              {
+                path: "Failure.yml",
+                response: { status: 200, data: "four" },
+                assertionResults: [{ status: "fail" }],
+              },
+            ],
+          },
+        ]),
+      });
+
+    const withoutBodies = await handleRun(
+      baseConfig,
+      input({ responseBodyMode: "none" }),
+      { runProcess },
+    );
+    const limitedFull = await handleRun(
+      baseConfig,
+      input({ responseBodyMode: "full", maxResponseBodyBytes: 3 }),
+      { runProcess },
+    );
+
+    expect(
+      (withoutBodies.structuredContent?.results as { response: unknown }[])[0]
+        ?.response,
+    ).toEqual({ status: 200 });
+    expect(
+      (limitedFull.structuredContent?.results as { response: unknown }[])[0]
+        ?.response,
+    ).toEqual({
+      status: 200,
+      bodyTruncated: true,
+      originalBodyBytes: 4,
     });
   });
 

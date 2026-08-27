@@ -6,7 +6,7 @@ import { type BruProcessResult, runBruProcess } from "../bruno/cli.js";
 import { BrunoMcpError } from "../bruno/errors.js";
 import {
   assertReportSize,
-  limitResponseBodies,
+  filterResponseBodies,
   normalizeBruReport,
 } from "../bruno/report.js";
 import type { Config } from "../config/config.js";
@@ -65,6 +65,20 @@ export const runInputSchema = z.object({
     .default(false)
     .describe(
       "Disable normal TLS certificate verification. Must be enabled by server policy.",
+    ),
+  responseBodyMode: z
+    .enum(["none", "onFailure", "full"])
+    .default("onFailure")
+    .describe(
+      "Response bodies to return in the MCP payload: none, only results with failed tests or assertions, or all results.",
+    ),
+  maxResponseBodyBytes: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Maximum serialized UTF-8 size of each returned response body. Oversized bodies are replaced by size metadata.",
     ),
 });
 
@@ -138,7 +152,12 @@ export async function handleRun(
       ? {}
       : { reportRaw: processResult.reportRaw }),
   });
-  const report = limitResponseBodies(redactReport(normalized));
+  const report = filterResponseBodies(redactReport(normalized), {
+    mode: input.responseBodyMode,
+    ...(input.maxResponseBodyBytes === undefined
+      ? {}
+      : { maxBodyBytes: input.maxResponseBodyBytes }),
+  });
 
   return {
     ...jsonResult({ ...report }),
