@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 
 import { z } from "zod";
 
@@ -17,8 +17,8 @@ export const DEFAULT_LOG_LEVEL: LogLevel = "info";
 
 /**
  * Fully validated, immutable runtime configuration derived from the process
- * environment. The only I/O side effect performed while producing a `Config`
- * is resolving {@link Config.root} to its canonical real path.
+ * environment. The only filesystem I/O performed while producing a `Config`
+ * is canonicalizing and validating {@link Config.root}.
  */
 export interface Config {
   /** Canonical real path all collection/request/env/exec paths must stay within. */
@@ -107,7 +107,16 @@ const rootField = z
     const candidate = isUnset(raw) ? process.cwd() : raw;
 
     try {
-      return realpathSync(candidate);
+      const canonicalPath = realpathSync(candidate);
+      if (!statSync(canonicalPath).isDirectory()) {
+        ctx.addIssue({
+          code: "custom",
+          message: `must resolve to a directory, received "${candidate}"`,
+        });
+        return z.NEVER;
+      }
+
+      return canonicalPath;
     } catch {
       ctx.addIssue({
         code: "custom",
@@ -120,7 +129,7 @@ const rootField = z
 const bruField = z
   .string()
   .optional()
-  .transform((raw) => (isUnset(raw) ? DEFAULT_BRU_EXECUTABLE : raw.trim()));
+  .transform((raw) => raw ?? DEFAULT_BRU_EXECUTABLE);
 
 const logLevelField = z
   .string()

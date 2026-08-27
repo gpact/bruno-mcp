@@ -1,4 +1,9 @@
-import { mkdtempSync, realpathSync } from "node:fs";
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -46,11 +51,11 @@ describe("loadConfig", () => {
     expect(config.logLevel).toBe("debug");
   });
 
-  it("does not trim or shell-escape the bru executable path beyond whitespace", () => {
+  it("stores the bru executable path as-is", () => {
     expect(loadConfig({ BRUNO_MCP_BRU: "  bru custom  " }).bru).toBe(
-      "bru custom",
+      "  bru custom  ",
     );
-    expect(loadConfig({ BRUNO_MCP_BRU: "" }).bru).toBe(DEFAULT_BRU_EXECUTABLE);
+    expect(loadConfig({ BRUNO_MCP_BRU: "" }).bru).toBe("");
   });
 
   describe("boolean parsing", () => {
@@ -130,11 +135,30 @@ describe("loadConfig", () => {
   describe("root canonicalization", () => {
     it("resolves BRUNO_MCP_ROOT to its canonical real path", () => {
       const realDir = mkdtempSync(join(tmpdir(), "bruno-mcp-root-"));
-      const nested = join(realDir, "a", "..");
 
-      const config = loadConfig({ BRUNO_MCP_ROOT: nested });
+      try {
+        const nested = join(realDir, "a", "..");
+        const config = loadConfig({ BRUNO_MCP_ROOT: nested });
 
-      expect(config.root).toBe(realpathSync(realDir));
+        expect(config.root).toBe(realpathSync(realDir));
+      } finally {
+        rmSync(realDir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects a root that resolves to a file", () => {
+      const realDir = mkdtempSync(join(tmpdir(), "bruno-mcp-root-"));
+      const file = join(realDir, "collection.yml");
+
+      try {
+        writeFileSync(file, "name: not-a-directory\n");
+
+        expect(() => loadConfig({ BRUNO_MCP_ROOT: file })).toThrow(
+          /BRUNO_MCP_ROOT: must resolve to a directory/,
+        );
+      } finally {
+        rmSync(realDir, { recursive: true, force: true });
+      }
     });
 
     it("rejects a root that cannot be resolved", () => {
