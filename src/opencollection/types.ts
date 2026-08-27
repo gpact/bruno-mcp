@@ -18,10 +18,8 @@ export interface CollectionSummary {
   openCollectionVersion: string;
 }
 
-/** Summary of a single request within a collection. */
-export interface RequestSummary {
-  /** Request file path relative to its collection root. */
-  path: string;
+/** Normalized request fields shared by request listing and inspection. */
+export interface RequestMetadata {
   /** Display name from `info.name`. */
   name: string;
   /** Request type from `info.type` (e.g. `"http"`, `"graphql"`, future types). */
@@ -32,6 +30,12 @@ export interface RequestSummary {
   method?: string;
   /** Request URL, when the request declares one. */
   url?: string;
+}
+
+/** Summary of a single request within a collection. */
+export interface RequestSummary extends RequestMetadata {
+  /** Request file path relative to its collection root. */
+  path: string;
 }
 
 /** Summary of an environment definition. */

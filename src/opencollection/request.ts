@@ -12,7 +12,11 @@ import {
   isEnvironmentsDir,
   isYamlFile,
 } from "./paths.js";
-import type { RequestDocument, RequestSummary } from "./types.js";
+import type {
+  RequestDocument,
+  RequestMetadata,
+  RequestSummary,
+} from "./types.js";
 
 /** Request type that carries HTTP method and URL metadata. */
 const HTTP_REQUEST_TYPE = "http";
@@ -174,42 +178,60 @@ function classifyRequest(
     throw error;
   }
 
+  const metadata = extractRequestMetadata(document);
+  if (metadata === undefined) {
+    return undefined;
+  }
+
+  return { path: relativePath, ...metadata };
+}
+
+/**
+ * Extract normalized request metadata from an already-parsed request document.
+ *
+ * Returns `undefined` when the document is not a request (no `info` block) so
+ * discovery can skip it. `info.type` is reported verbatim; HTTP method and URL
+ * are copied only for `http` requests, and the URL is preserved exactly as
+ * stored, keeping literal Bruno variables such as `{{baseUrl}}`.
+ */
+export function extractRequestMetadata(
+  document: unknown,
+): RequestMetadata | undefined {
   if (!isRecord(document) || !isRecord(document.info)) {
     return undefined;
   }
 
   const info = document.info;
-  const summary: RequestSummary = {
-    path: relativePath,
+  const metadata: RequestMetadata = {
     name: typeof info.name === "string" ? info.name : "",
     type: typeof info.type === "string" ? info.type : "",
   };
 
   if (typeof info.seq === "number") {
-    summary.sequence = info.seq;
+    metadata.sequence = info.seq;
   }
 
-  if (summary.type === HTTP_REQUEST_TYPE) {
-    applyHttpMetadata(summary, (document as RequestDocument).http);
+  if (metadata.type === HTTP_REQUEST_TYPE) {
+    applyHttpMetadata(metadata, (document as RequestDocument).http);
   }
 
-  return summary;
+  return metadata;
 }
 
 /**
- * Copy HTTP method and URL onto the summary when present. The URL is preserved
+ * Copy HTTP method and URL onto the metadata when present. The URL is preserved
  * exactly as stored, keeping literal Bruno variables such as `{{baseUrl}}`.
  */
-function applyHttpMetadata(summary: RequestSummary, http: unknown): void {
+function applyHttpMetadata(metadata: RequestMetadata, http: unknown): void {
   if (!isRecord(http)) {
     return;
   }
 
   if (typeof http.method === "string") {
-    summary.method = http.method;
+    metadata.method = http.method;
   }
   if (typeof http.url === "string") {
-    summary.url = http.url;
+    metadata.url = http.url;
   }
 }
 
