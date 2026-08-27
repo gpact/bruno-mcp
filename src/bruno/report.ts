@@ -1,3 +1,7 @@
+import { Buffer } from "node:buffer";
+
+import { BrunoMcpError } from "./errors.js";
+
 /** Raw process fields needed to normalize a Bruno JSON report. */
 export interface BruReportInput {
   readonly exitCode: number;
@@ -29,6 +33,8 @@ export interface NormalizedResponse {
   readonly status?: number | string;
   readonly durationMs?: number;
   readonly body?: unknown;
+  readonly bodyTruncated?: true;
+  readonly originalBodyBytes?: number;
 }
 
 export type NormalizedTestStatus = "passed" | "failed" | "unknown";
@@ -93,6 +99,77 @@ interface NormalizedIterations {
 }
 
 const REPORT_PARSE_MESSAGE = "Bruno JSON reporter output could not be parsed.";
+
+/** Default maximum serialized size of one normalized response body (256 KiB). */
+export const DEFAULT_MAX_RESPONSE_BODY_BYTES = 262_144;
+
+/**
+ * Reject raw reporter output whose UTF-8 byte length exceeds the configured
+ * limit. The error includes sizes only and never includes reporter content.
+ */
+export function assertReportSize(
+  reportRaw: string | undefined,
+  maxReportBytes: number,
+): void {
+  if (reportRaw === undefined) {
+    return;
+  }
+
+  const reportBytes = Buffer.byteLength(reportRaw, "utf8");
+  if (reportBytes > maxReportBytes) {
+    throw new BrunoMcpError(
+      "REPORT_TOO_LARGE",
+      `Bruno JSON report is ${reportBytes} bytes, exceeding the ${maxReportBytes} byte limit.`,
+    );
+  }
+}
+
+function bodyByteLength(body: unknown): number {
+  if (typeof body === "string") {
+    return Buffer.byteLength(body, "utf8");
+  }
+
+  const serialized = JSON.stringify(body);
+  return serialized === undefined ? 0 : Buffer.byteLength(serialized, "utf8");
+}
+
+/**
+ * Return a copy of a normalized report with oversized response bodies removed.
+ * Explicit metadata records every removal and its original serialized byte size.
+ */
+export function limitResponseBodies(
+  report: NormalizedBruReport,
+  maxBodyBytes = DEFAULT_MAX_RESPONSE_BODY_BYTES,
+): NormalizedBruReport {
+  if (report.results === undefined) {
+    return report;
+  }
+
+  let changed = false;
+  const results = report.results.map((result) => {
+    if (!Object.hasOwn(result.response, "body")) {
+      return result;
+    }
+
+    const originalBodyBytes = bodyByteLength(result.response.body);
+    if (originalBodyBytes <= maxBodyBytes) {
+      return result;
+    }
+
+    changed = true;
+    const { body: _body, ...response } = result.response;
+    return {
+      ...result,
+      response: {
+        ...response,
+        bodyTruncated: true as const,
+        originalBodyBytes,
+      },
+    };
+  });
+
+  return changed ? { ...report, results } : report;
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);

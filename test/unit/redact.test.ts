@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED, redactSecretValue } from "../../src/security/redact.js";
+import {
+  REDACTED,
+  SENSITIVE_HEADERS,
+  redactReport,
+  redactSecretValue,
+} from "../../src/security/redact.js";
 
 describe("redactSecretValue", () => {
   it("returns non-secret values verbatim", () => {
@@ -28,5 +33,74 @@ describe("redactSecretValue", () => {
   it("coerces non-string non-secret values to strings", () => {
     expect(redactSecretValue(8080, false)).toBe("8080");
     expect(redactSecretValue(true, false)).toBe("true");
+  });
+});
+
+describe("redactReport", () => {
+  it.each(SENSITIVE_HEADERS)(
+    "redacts %s case-insensitively while preserving its name",
+    (header) => {
+      const mixedCase = [...header]
+        .map((character, index) =>
+          index % 2 === 0 ? character.toLowerCase() : character.toUpperCase(),
+        )
+        .join("");
+      const report = {
+        nested: {
+          request: {
+            headers: {
+              [mixedCase]: `${header} secret`,
+              Accept: "application/json",
+            },
+          },
+        },
+      };
+
+      const redacted = redactReport(report);
+
+      expect(redacted.nested.request.headers).toEqual({
+        [mixedCase]: REDACTED,
+        Accept: "application/json",
+      });
+      expect(report.nested.request.headers[mixedCase]).toBe(`${header} secret`);
+    },
+  );
+
+  it("redacts nested response headers and secret environment values", () => {
+    const report = {
+      iterations: [
+        {
+          response: {
+            headers: { "set-cookie": ["session=secret"] },
+            data: {
+              environment: {
+                variables: [
+                  { name: "apiKey", value: "plaintext secret", secret: true },
+                  { name: "baseUrl", value: "https://example.test", secret: false },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    expect(redactReport(report)).toEqual({
+      iterations: [
+        {
+          response: {
+            headers: { "set-cookie": REDACTED },
+            data: {
+              environment: {
+                variables: [
+                  { name: "apiKey", value: REDACTED, secret: true },
+                  { name: "baseUrl", value: "https://example.test", secret: false },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
   });
 });

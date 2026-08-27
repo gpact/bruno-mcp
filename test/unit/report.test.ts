@@ -2,7 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeBruReport } from "../../src/bruno/report.js";
+import { BrunoMcpError } from "../../src/bruno/errors.js";
+import {
+  DEFAULT_MAX_RESPONSE_BODY_BYTES,
+  assertReportSize,
+  limitResponseBodies,
+  normalizeBruReport,
+} from "../../src/bruno/report.js";
 
 function reportFixture(name: string): string {
   return readFileSync(new URL(`../fixtures/reports/${name}`, import.meta.url), "utf8");
@@ -223,5 +229,86 @@ describe("normalizeBruReport resilience", () => {
     });
 
     expect(normalized.summary).toEqual({ total: 7, passed: 0, failed: 1 });
+  });
+});
+
+describe("report output limits", () => {
+  it("measures the raw report as UTF-8 bytes and rejects oversized output", () => {
+    expect(() => assertReportSize("é", 2)).not.toThrow();
+
+    let caught: unknown;
+    try {
+      assertReportSize("é", 1);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(BrunoMcpError);
+    expect((caught as BrunoMcpError).code).toBe("REPORT_TOO_LARGE");
+    expect((caught as BrunoMcpError).message).toContain("2 bytes");
+    expect((caught as BrunoMcpError).message).not.toContain("é");
+  });
+
+  it("accepts missing reports and output exactly at the configured limit", () => {
+    expect(() => assertReportSize(undefined, 1)).not.toThrow();
+    expect(() => assertReportSize("abc", 3)).not.toThrow();
+  });
+
+  it("removes oversized bodies and exposes deterministic byte metadata", () => {
+    const report = normalizeBruReport({
+      exitCode: 0,
+      stderr: "",
+      reportRaw: JSON.stringify([
+        {
+          results: [
+            {
+              path: "Large.yml",
+              response: { status: 200, data: { payload: "éé" } },
+            },
+            {
+              path: "Small.yml",
+              response: { status: 204, data: "ok" },
+            },
+          ],
+        },
+      ]),
+    });
+
+    const limited = limitResponseBodies(report, 10);
+
+    expect(limited.results?.[0]?.response).toEqual({
+      status: 200,
+      bodyTruncated: true,
+      originalBodyBytes: 18,
+    });
+    expect(limited.results?.[1]?.response).toEqual({ status: 204, body: "ok" });
+    expect(report.results?.[0]?.response).toEqual({
+      status: 200,
+      body: { payload: "éé" },
+    });
+  });
+
+  it("uses a conservative response-body limit by default", () => {
+    const report = normalizeBruReport({
+      exitCode: 0,
+      stderr: "",
+      reportRaw: JSON.stringify([
+        {
+          results: [
+            {
+              path: "Large.yml",
+              response: {
+                data: "x".repeat(DEFAULT_MAX_RESPONSE_BODY_BYTES + 1),
+              },
+            },
+          ],
+        },
+      ]),
+    });
+
+    expect(limitResponseBodies(report).results?.[0]?.response).toEqual({
+      bodyTruncated: true,
+      originalBodyBytes: DEFAULT_MAX_RESPONSE_BODY_BYTES + 1,
+    });
   });
 });
