@@ -369,7 +369,9 @@ Useful commands:
 | `npm run dev` | Run the TypeScript entry point in development. |
 | `npm run build` | Compile the server to `dist/`. |
 | `npm start` | Run the compiled stdio server. |
-| `npm run typecheck` | Type-check without emitting files. |
+| `npm run check` | Run all checks required by CI. |
+| `npm run lint` | Lint source, tests, and tooling. |
+| `npm run typecheck` | Type-check source, tests, and tooling without emitting files. |
 | `npm test` | Run the unit test suite once. |
 | `npm run test:watch` | Run unit tests in watch mode. |
 | `npm run test:integration` | Run the integration test suite. |
@@ -378,10 +380,7 @@ Useful commands:
 Before submitting a change, run:
 
 ```sh
-npm test
-npm run test:integration
-npm run typecheck
-npm run build
+npm run check
 ```
 
 ## Known limitations

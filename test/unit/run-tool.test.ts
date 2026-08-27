@@ -257,8 +257,11 @@ describe("handleRun execution", () => {
       ],
     });
     expect(
-      (result.structuredContent?.results as { response: unknown }[])[0]
-        ?.response,
+      (
+        result.structuredContent as
+          | { results?: { response: unknown }[] }
+          | undefined
+      )?.results?.[0]?.response,
     ).toEqual({ status: 200 });
   });
 
@@ -291,12 +294,18 @@ describe("handleRun execution", () => {
     );
 
     expect(
-      (withoutBodies.structuredContent?.results as { response: unknown }[])[0]
-        ?.response,
+      (
+        withoutBodies.structuredContent as
+          | { results?: { response: unknown }[] }
+          | undefined
+      )?.results?.[0]?.response,
     ).toEqual({ status: 200 });
     expect(
-      (limitedFull.structuredContent?.results as { response: unknown }[])[0]
-        ?.response,
+      (
+        limitedFull.structuredContent as
+          | { results?: { response: unknown }[] }
+          | undefined
+      )?.results?.[0]?.response,
     ).toEqual({
       status: 200,
       bodyTruncated: true,
