@@ -56,6 +56,24 @@ export interface EnvironmentVariable {
   [key: string]: unknown;
 }
 
+/** A single environment variable as exposed through environment inspection. */
+export interface EnvironmentVariableDetail {
+  name: string;
+  /**
+   * Non-secret values are returned verbatim; secret values are always the
+   * redaction placeholder, never the stored value.
+   */
+  value: string;
+  secret: boolean;
+}
+
+/** Full environment detail, with secret values already redacted. */
+export interface EnvironmentDetail {
+  /** Environment name, derived from the file base name. */
+  name: string;
+  variables: EnvironmentVariableDetail[];
+}
+
 /** Parsed shape of an `environments/*.yml` document. */
 export interface EnvironmentDocument {
   variables?: EnvironmentVariable[];
