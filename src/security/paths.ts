@@ -1,5 +1,5 @@
 /**
- * Security-critical path resolution helpers (spec §30).
+ * Security-critical path resolution helpers.
  *
  * Every collection, request, environment, and execution path handled by the
  * server must ultimately resolve **beneath** `BRUNO_MCP_ROOT` (and, for
@@ -50,8 +50,7 @@ export function resolveWithinRoot(root: string, candidate: string): string {
 /**
  * Resolve `candidate` beneath a specific collection root, which must itself live
  * beneath `root`. Used for request/environment paths expressed relative to a
- * collection (spec §30: "Collection-relative paths must resolve beneath their
- * collection root").
+ * collection.
  *
  * @param root - The `BRUNO_MCP_ROOT` boundary.
  * @param collectionRoot - The collection root, either absolute or relative to

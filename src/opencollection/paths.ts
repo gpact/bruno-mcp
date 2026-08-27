@@ -1,6 +1,6 @@
 /**
  * Well-known OpenCollection filenames and exclusions used when classifying the
- * files inside a collection (spec §10). Centralizing them here keeps discovery
+ * files inside a collection. Centralizing them here keeps discovery
  * and tool code consistent.
  */
 
@@ -17,7 +17,7 @@ export const YAML_EXTENSION = ".yml";
 
 /**
  * Filenames that are collection/folder metadata and must never be treated as
- * requests (spec §10 exclusions).
+ * requests.
  */
 export const COLLECTION_METADATA_FILES: ReadonlySet<string> = new Set([
   OPENCOLLECTION_FILE,

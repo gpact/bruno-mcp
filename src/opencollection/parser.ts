@@ -14,11 +14,10 @@ export interface ParseYamlOptions {
  * Parse YAML text into a plain JavaScript value.
  *
  * The `yaml` package performs no schema validation, so unknown OpenCollection
- * fields are tolerated by design (spec §12, forward compatibility). Parse
- * failures are surfaced as a structured {@link BrunoMcpError} with code
- * `INVALID_YAML` rather than an uncaught exception.
+ * fields are tolerated by design. Parse failures are surfaced as a structured
+ * {@link BrunoMcpError} with code `INVALID_YAML` rather than an uncaught exception.
  *
- * This function is read-only: it never rewrites the source (spec §12).
+ * This function is read-only: it never rewrites the source.
  */
 export function parseYaml(
   content: string,

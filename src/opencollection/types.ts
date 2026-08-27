@@ -3,8 +3,7 @@
  *
  * These types describe the minimum structure the MCP relies on. Documents may
  * carry additional, unrecognized OpenCollection fields — the index signatures
- * below keep the model forward-compatible with future Bruno v4 additions
- * (spec §12).
+ * below keep the model forward-compatible with future Bruno v4 additions.
  */
 
 /** Summary of a discovered OpenCollection. */

@@ -28,7 +28,7 @@ export type BruCommandRunner = (
  *
  * The executable and every argument are passed as a discrete array with
  * `shell: false` so nothing is ever interpolated into, or interpreted by, a
- * shell (spec §8, §29). `windowsHide` avoids flashing a console window.
+ * shell. `windowsHide` avoids flashing a console window.
  */
 export const runBruCommand: BruCommandRunner = (file, args) =>
   new Promise<BruCommandResult>((resolve, reject) => {

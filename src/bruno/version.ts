@@ -6,16 +6,16 @@ import {
 } from "./cli.js";
 
 /**
- * Inclusive lower bound of the supported Bruno CLI version range (spec §2, §8).
+ * Inclusive lower bound of the supported Bruno CLI version range.
  */
 export const MIN_BRUNO_VERSION = "4.0.0";
 /**
- * Exclusive upper bound of the supported Bruno CLI version range (spec §2, §8).
+ * Exclusive upper bound of the supported Bruno CLI version range.
  */
 export const MAX_BRUNO_VERSION_EXCLUSIVE = "5.0.0";
 
 /**
- * Shared first line of the actionable version errors (spec §8).
+ * Shared first line of the actionable version errors.
  */
 const REQUIREMENT_MESSAGE =
   `Bruno MCP requires Bruno CLI >= ${MIN_BRUNO_VERSION} and ` +
@@ -119,7 +119,7 @@ export interface ValidateBrunoVersionOptions {
 }
 
 /**
- * Discover the Bruno CLI and validate its version at startup (spec §8).
+ * Discover the Bruno CLI and validate its version at startup.
  *
  * Runs `bru --version` through the injectable {@link BruCommandRunner} (never a
  * shell) and enforces the supported range. Fails fast with an actionable,
