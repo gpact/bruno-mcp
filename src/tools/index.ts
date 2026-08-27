@@ -19,6 +19,10 @@ import {
   registerListRequests,
 } from "./list-requests.js";
 import { RUN_TOOL_NAME, registerRun } from "./run.js";
+import {
+  SEARCH_REQUESTS_TOOL_NAME,
+  registerSearchRequests,
+} from "./search-requests.js";
 
 export {
   toToolErrorResult,
@@ -43,6 +47,7 @@ const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerListEnvironments,
   registerGetEnvironment,
   registerRun,
+  registerSearchRequests,
 ];
 
 /**
@@ -57,6 +62,7 @@ export const TOOL_NAMES: readonly string[] = [
   LIST_ENVIRONMENTS_TOOL_NAME,
   GET_ENVIRONMENT_TOOL_NAME,
   RUN_TOOL_NAME,
+  SEARCH_REQUESTS_TOOL_NAME,
 ];
 
 /**

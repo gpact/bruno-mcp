@@ -38,6 +38,12 @@ export interface RequestSummary extends RequestMetadata {
   path: string;
 }
 
+/** Request summary tagged with its owning collection identifier. */
+export interface RequestSearchResult extends RequestSummary {
+  /** Collection path relative to `BRUNO_MCP_ROOT`. */
+  collection: string;
+}
+
 /** Summary of an environment definition. */
 export interface EnvironmentSummary {
   /** Environment name (file base name without extension). */

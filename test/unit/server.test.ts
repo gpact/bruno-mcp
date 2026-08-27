@@ -119,7 +119,7 @@ describe("createServer", () => {
 });
 
 describe("tool registration", () => {
-  it("registers the six required tools over MCP", async () => {
+  it("registers the seven required tools over MCP", async () => {
     const client = await connectClient(createServer(config));
     await initialize(client);
 
@@ -137,6 +137,7 @@ describe("tool registration", () => {
       "bruno_list_environments",
       "bruno_get_environment",
       "bruno_run",
+      "bruno_search_requests",
     ]) {
       expect(names).toContain(required);
     }

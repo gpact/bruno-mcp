@@ -41,7 +41,7 @@ export function discoverCollections(root: string): CollectionSummary[] {
   }
 }
 
-function isSkippableCollectionError(error: unknown): boolean {
+export function isSkippableCollectionError(error: unknown): boolean {
   return (
     error instanceof BrunoMcpError &&
     (error.code === "INVALID_COLLECTION" ||

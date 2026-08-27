@@ -4,6 +4,12 @@ import { z } from "zod";
 import type { Config } from "../config/config.js";
 import { discoverRequests } from "../opencollection/request.js";
 import type { RequestSummary } from "../opencollection/types.js";
+import {
+  matchesMethod,
+  matchesQuery,
+  matchesType,
+  normalizeFilter,
+} from "./request-filters.js";
 import { jsonResult, runTool } from "./result.js";
 
 /** MCP tool name. */
@@ -86,42 +92,6 @@ export function registerListRequests(server: McpServer, config: Config): void {
     },
     (input) => runTool(() => jsonResult({ ...listRequests(config, input) })),
   );
-}
-
-/** Treat absent and blank filters alike as "no filter". */
-function normalizeFilter(value: string | undefined): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
-/** Case-insensitive substring match against name, path, and URL (when present). */
-function matchesQuery(request: RequestSummary, query: string | undefined): boolean {
-  if (query === undefined) {
-    return true;
-  }
-
-  const needle = query.toLowerCase();
-  const haystacks = [request.name, request.path, request.url ?? ""];
-  return haystacks.some((value) => value.toLowerCase().includes(needle));
-}
-
-/** Case-insensitive match against the HTTP method, when a filter is given. */
-function matchesMethod(request: RequestSummary, method: string | undefined): boolean {
-  if (method === undefined) {
-    return true;
-  }
-  return request.method?.toLowerCase() === method.toLowerCase();
-}
-
-/** Case-insensitive match against the request type, when a filter is given. */
-function matchesType(request: RequestSummary, type: string | undefined): boolean {
-  if (type === undefined) {
-    return true;
-  }
-  return request.type.toLowerCase() === type.toLowerCase();
 }
 
 /**
