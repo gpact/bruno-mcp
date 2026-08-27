@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 
 export interface TestHttpServer {
   readonly baseUrl: string;
+  getSlowRequestCount(): number;
   close(): Promise<void>;
 }
 
@@ -36,10 +37,29 @@ function listen(server: Server, port: number): Promise<void> {
   });
 }
 
+function delayWhileConnected(
+  response: import("node:http").ServerResponse,
+  delayMs: number,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    let timer: NodeJS.Timeout;
+    const finish = (connected: boolean): void => {
+      clearTimeout(timer);
+      response.off("close", onClose);
+      resolve(connected);
+    };
+    const onClose = (): void => finish(false);
+
+    timer = setTimeout(() => finish(true), delayMs);
+    response.once("close", onClose);
+  });
+}
+
 export async function startTestHttpServer(
   options: TestHttpServerOptions = {},
 ): Promise<TestHttpServer> {
   const slowDelayMs = options.slowDelayMs ?? 1_000;
+  let slowRequestCount = 0;
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
@@ -66,8 +86,10 @@ export async function startTestHttpServer(
     }
 
     if (url.pathname === "/slow") {
-      await new Promise((resolve) => setTimeout(resolve, slowDelayMs));
-      sendJson(response, 200, { status: "delayed" });
+      slowRequestCount += 1;
+      if (await delayWhileConnected(response, slowDelayMs)) {
+        sendJson(response, 200, { status: "delayed" });
+      }
       return;
     }
 
@@ -83,6 +105,7 @@ export async function startTestHttpServer(
 
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
+    getSlowRequestCount: () => slowRequestCount,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => {

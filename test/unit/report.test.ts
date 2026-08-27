@@ -76,15 +76,15 @@ describe("normalizeBruReport captured reports", () => {
 
 describe("normalizeBruReport exit codes", () => {
   it.each([
-    [0, "passed", false],
-    [1, "failed", false],
-    [4, "error", true],
-    [5, "error", true],
-    [6, "error", true],
-    [255, "error", true],
+    [0, "passed", false, undefined],
+    [1, "failed", false, undefined],
+    [4, "error", true, "BRUNO_EXECUTION_ERROR"],
+    [5, "error", true, "BRUNO_EXECUTION_ERROR"],
+    [6, "error", true, "ENVIRONMENT_NOT_FOUND"],
+    [255, "error", true, "BRUNO_EXECUTION_ERROR"],
   ] as const)(
     "classifies exit code %i as %s with isError=%s",
-    (exitCode, status, isError) => {
+    (exitCode, status, isError, errorCode) => {
       const normalized = normalizeBruReport({
         exitCode,
         stderr: "bru diagnostic",
@@ -94,9 +94,7 @@ describe("normalizeBruReport exit codes", () => {
       expect(normalized.isError).toBe(isError);
       expect(normalized.reportAvailable).toBe(false);
       expect(normalized.diagnostics?.stderr).toBe("bru diagnostic");
-      expect(normalized.code).toBe(
-        isError ? "BRUNO_EXECUTION_ERROR" : undefined,
-      );
+      expect(normalized.code).toBe(errorCode);
     },
   );
 
@@ -163,7 +161,7 @@ describe("normalizeBruReport resilience", () => {
       reportRaw: "null",
     });
 
-    expect(normalized.code).toBe("BRUNO_EXECUTION_ERROR");
+    expect(normalized.code).toBe("ENVIRONMENT_NOT_FOUND");
     expect(normalized.isError).toBe(true);
     expect(normalized.diagnostics).toEqual({
       stderr: "missing environment",

@@ -55,6 +55,7 @@ export interface NormalizedRequestResult {
 
 export type ReportErrorCode =
   | "BRUNO_EXECUTION_ERROR"
+  | "ENVIRONMENT_NOT_FOUND"
   | "REPORT_PARSE_ERROR";
 
 export interface NormalizedReportError {
@@ -427,6 +428,13 @@ function executionStatus(exitCode: number): ExecutionStatus {
 }
 
 function executionError(exitCode: number): NormalizedReportError {
+  if (exitCode === 6) {
+    return {
+      code: "ENVIRONMENT_NOT_FOUND",
+      message: "The requested Bruno environment does not exist.",
+    };
+  }
+
   return {
     code: "BRUNO_EXECUTION_ERROR",
     message: `Bruno execution failed with exit code ${exitCode}.`,

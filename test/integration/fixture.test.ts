@@ -29,6 +29,7 @@ describe("integration fixture", () => {
       "environments/Local.yml",
       "Health.yml",
       "Failure.yml",
+      "Slow.yml",
       "Users/folder.yml",
       "Users/Get User.yml",
     ];
