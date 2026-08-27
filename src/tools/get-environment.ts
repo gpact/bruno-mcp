@@ -11,7 +11,9 @@ export const GET_ENVIRONMENT_TOOL_NAME = "bruno_get_environment";
 const inputSchema = z.object({
   collection: z
     .string()
-    .describe("Collection identifier, relative to the configured workspace root."),
+    .describe(
+      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name. It may be nested, for example collections/hotel.",
+    ),
   environment: z
     .string()
     .describe(
