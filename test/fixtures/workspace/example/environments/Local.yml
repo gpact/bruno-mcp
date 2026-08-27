@@ -1,0 +1,7 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: http://127.0.0.1:4015
+  - name: apiKey
+    value: integration-test-secret
+    secret: true

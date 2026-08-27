@@ -1,0 +1,7 @@
+{
+  "scenario": "missing environment",
+  "cliVersion": "4.0.0",
+  "exitCode": 6,
+  "reportAvailable": false,
+  "stderr": "Environment file not found: environments/DoesNotExist.yml"
+}

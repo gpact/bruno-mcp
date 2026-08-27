@@ -1,0 +1,86 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "Failure.yml"
+        },
+        "request": {
+          "method": "GET",
+          "url": "http://127.0.0.1:4015/failure",
+          "headers": {
+            "content-type": null
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": {
+            "content-type": "application/json",
+            "date": "Thu, 27 Aug 2026 05:49:59 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5",
+            "transfer-encoding": "chunked"
+          },
+          "data": {
+            "value": "actual"
+          },
+          "url": "http://127.0.0.1/failure",
+          "responseTime": 19,
+          "duration": 19,
+          "size": 18
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "mHpco2O1fYEu0Zmjbvtr_",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 201",
+            "rhsOperand": "201",
+            "operator": "eq",
+            "status": "fail",
+            "error": "expected 200 to equal 201"
+          }
+        ],
+        "testResults": [
+          {
+            "description": "returns the expected status",
+            "status": "fail",
+            "error": "expected 200 to equal 201",
+            "uid": "PzmSvaO9ZAGazOTAkiVL1"
+          }
+        ],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.316485382,
+        "name": "Failure",
+        "suitename": "<fixture>/Failure",
+        "path": "Failure.yml",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 0,
+      "failedRequests": 1,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "skippedByBail": 0,
+      "totalAssertions": 1,
+      "passedAssertions": 0,
+      "failedAssertions": 1,
+      "totalTests": 1,
+      "passedTests": 0,
+      "failedTests": 1,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]
