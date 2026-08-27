@@ -2,23 +2,45 @@
   "name": "@gpact/bruno-mcp",
   "version": "0.1.0",
   "description": "A local MCP server for Bruno v4 OpenCollection collections",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "bruno",
+    "usebruno",
+    "api-testing",
+    "opencollection",
+    "stdio",
+    "cli"
+  ],
+  "homepage": "https://github.com/gpact/bruno-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/gpact/bruno-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gpact/bruno-mcp.git"
+  },
+  "author": "gpact",
   "type": "module",
   "bin": {
-    "bruno-mcp": "./dist/index.js"
+    "bruno-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "tsc",
     "check": "npm run check:code && npm pack --dry-run",
     "check:code": "npm run lint && npm run typecheck && npm test && npm run test:integration && npm run build",
     "dev": "tsx src/index.ts",
     "lint": "oxlint --deny-warnings src test vitest.config.ts",
     "prepack": "npm run build",
+    "prepublishOnly": "npm run check:code",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --mode integration",
