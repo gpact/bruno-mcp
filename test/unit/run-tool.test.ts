@@ -167,10 +167,8 @@ describe("handleRun execution", () => {
     expect(calls[0]!.buildArgs("/tmp/report.json")).toEqual([
       "run",
       "Health.yml",
-      "--env",
-      "Local",
-      "--env-var",
-      "locale=en-US",
+      "--env=Local",
+      "--env-var=locale=en-US",
       "--bail",
       "--reporter-json",
       "/tmp/report.json",

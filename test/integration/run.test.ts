@@ -1,4 +1,4 @@
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -280,4 +280,104 @@ describe("bruno_run with Bruno CLI 4.x", () => {
       code: "EXECUTION_TIMEOUT",
     });
   }, 15_000);
+
+  it("rejects an option-like target instead of forwarding it to Bruno", async () => {
+    const { result, processResults } = await executeRun({
+      targets: ["--insecure"],
+      environment: "Local",
+    });
+
+    // Bruno is never spawned: the option can never reach its parser and bypass
+    // the structured insecure policy check.
+    expect(processResults).toHaveLength(0);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      code: "INVALID_TARGET",
+    });
+  });
+
+  it("rejects a sandbox-smuggling target instead of forwarding it to Bruno", async () => {
+    const { result, processResults } = await executeRun({
+      targets: ["--sandbox=developer"],
+      environment: "Local",
+    });
+
+    expect(processResults).toHaveLength(0);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      code: "INVALID_TARGET",
+    });
+  });
+
+  it("keeps an option-like environment name bound to the env option", async () => {
+    const { result, processResults } = await executeRun({
+      targets: ["Health.yml"],
+      environment: "--sandbox=developer",
+    });
+
+    expect(processResults[0]?.exitCode).toBe(6);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      code: "ENVIRONMENT_NOT_FOUND",
+    });
+  });
+
+  it("keeps an option-like variable name bound to the env-var option", async () => {
+    const outputDirectory = await mkdtemp(
+      join(tmpdir(), "bruno-mcp-no-option-injection-"),
+    );
+    const injectedReportPath = join(outputDirectory, "injected.html");
+
+    try {
+      const { result, processResults } = await executeRun({
+        targets: ["Health.yml"],
+        environment: "Local",
+        variables: {
+          baseUrl: httpServer.baseUrl,
+          "--reporter-html": injectedReportPath,
+        },
+      });
+
+      expect(processResults[0]?.exitCode).toBe(0);
+      expect(result.isError).toBe(false);
+      await expect(access(injectedReportPath)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      await rm(outputDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an environment reference that traverses outside the collection", async () => {
+    const { result, processResults } = await executeRun({
+      targets: ["Health.yml"],
+      environment: "../../../environments/SHARED",
+    });
+
+    expect(processResults).toHaveLength(0);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      code: "INVALID_ENVIRONMENT_NAME",
+    });
+  });
+
+  it("accepts a collection-relative environment reference and runs normally", async () => {
+    const { result, processResults } = await executeRun({
+      targets: ["Health.yml"],
+      environment: "environments/Local.yml",
+    });
+
+    expect(processResults[0]?.exitCode).toBe(0);
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      isError: false,
+      execution: { status: "passed", exitCode: 0 },
+      results: [
+        {
+          path: "Health.yml",
+          response: { status: 200 },
+        },
+      ],
+    });
+  });
 });
