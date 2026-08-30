@@ -1,0 +1,45 @@
+name: Engineering task
+description: Track technical or maintenance work
+title: "[Chore]: "
+labels:
+  - chore
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What needs to be accomplished?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this work needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      value: |
+        - [ ] ...
+        - [ ] ...
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Technical notes
+      description: |
+        Relevant modules, APIs, constraints, dependencies,
+        implementation ideas, or known edge cases.
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] ...
+        - [ ] ...

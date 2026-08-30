@@ -1,0 +1,90 @@
+name: Bug report
+description: Report unexpected or incorrect behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem.
+
+        Please provide enough information for someone else to understand
+        and reproduce the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+      placeholder: Describe the problem clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: What steps consistently reproduce the problem?
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: |
+        Include logs, stack traces, screenshots, related issues, or
+        anything else that may be useful.
+
+  - type: input
+    id: bruno-mcp-version
+    attributes:
+      label: Bruno MCP version
+      description: Which version or commit of Bruno MCP were you running?
+      placeholder: "e.g. 0.1.0 or a commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: bruno-cli-version
+    attributes:
+      label: Bruno CLI version
+      description: Output of `bru --version`.
+      placeholder: "e.g. 4.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`.
+      placeholder: "e.g. v22.11.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. macOS 14.5, Ubuntu 24.04, Windows 11"
+
+  - type: input
+    id: mcp-host
+    attributes:
+      label: MCP host/client
+      description: Which MCP client or host were you using?
+      placeholder: "e.g. Claude Desktop, custom stdio client"

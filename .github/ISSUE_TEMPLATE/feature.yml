@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a new feature or improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are we trying to solve?
+      placeholder: |
+        Describe the current limitation, pain point, or opportunity.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        Describe the desired behavior. Implementation details are optional.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: What needs to be true for this issue to be considered complete?
+      value: |
+        - [ ] ...
+        - [ ] ...
+        - [ ] ...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        Are there alternative solutions or workarounds worth considering?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: |
+        Add technical context, diagrams, related issues, examples, or references.
