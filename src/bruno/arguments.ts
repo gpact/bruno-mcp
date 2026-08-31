@@ -8,7 +8,11 @@
  * rather than being folded into a shell string.
  */
 
+import { lstatSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Config } from "../config/config.js";
+import { ENVIRONMENTS_DIR, YAML_EXTENSION } from "../opencollection/paths.js";
 import { resolveWithinCollection } from "../security/paths.js";
 import { BrunoMcpError } from "./errors.js";
 
@@ -60,6 +64,168 @@ const DEVELOPER_SANDBOX: SandboxMode = "developer";
  */
 const FORBIDDEN_NAME_CHARS = /[\0\n\r]/;
 
+/** Leading token Bruno's argument parser treats as an option, never a path. */
+const OPTION_PREFIX = "-";
+
+/** Matches a path separator (POSIX or Windows) inside an environment name. */
+const PATH_SEPARATOR = /[\\/]/;
+
+/**
+ * Whether `value` contains any C0 control character (U+0000-U+001F) or DEL
+ * (U+007F). Such bytes could break argument framing, smuggle control sequences
+ * into the child process, or corrupt diagnostics, so tokens carrying them are
+ * rejected. This is a code-point scan rather than a control-character regex so
+ * the intent stays explicit.
+ */
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Whether an existing path is a symbolic link. Missing paths are not links. */
+function isExistingSymbolicLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error.code === "ENOENT" || error.code === "ENOTDIR")
+    ) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Validate a single run target so it can only ever act as a collection-relative
+ * request or folder path, never as a Bruno CLI option.
+ *
+ * Bruno parses its run arguments with yargs, which classifies any token that
+ * begins with "-" as an option regardless of position, and does not bind
+ * operands that follow a "--" terminator to the variadic `paths` positional
+ * (they are silently dropped, expanding the run to the whole collection). A
+ * "--" terminator therefore cannot force an option-like token to be treated as
+ * data, so such a target is rejected outright. The resolved location is then
+ * confirmed to stay within the collection root, symlinks included.
+ *
+ * @throws {BrunoMcpError} `INVALID_TARGET` when the target is empty, carries a
+ *   control character, or begins with "-".
+ * @throws {BrunoMcpError} `PATH_OUTSIDE_ROOT` when the target escapes the
+ *   collection root via traversal, an absolute path, or a symlink.
+ */
+function assertRunnableTarget(
+  root: string,
+  collection: string,
+  target: string,
+): void {
+  if (target.length === 0) {
+    throw new BrunoMcpError("INVALID_TARGET", "A run target must not be empty.");
+  }
+
+  if (hasControlCharacter(target)) {
+    throw new BrunoMcpError(
+      "INVALID_TARGET",
+      `Run target ${JSON.stringify(target)} must not contain control characters.`,
+    );
+  }
+
+  if (target.startsWith(OPTION_PREFIX)) {
+    throw new BrunoMcpError(
+      "INVALID_TARGET",
+      `Run target ${JSON.stringify(target)} must be a collection-relative request or folder path, not an option.`,
+    );
+  }
+
+  // Verify containment against the collection root before the value is ever
+  // handed to Bruno. Targets may be request files or folders, so no suffix is
+  // required; only the resolved location matters.
+  resolveWithinCollection(root, collection, target);
+}
+
+/**
+ * Reduce an environment reference to the bare name Bruno expects for `--env`,
+ * rejecting anything that could select a file outside the collection's
+ * `environments/` directory.
+ *
+ * Bruno resolves `--env <name>` to `<collection>/environments/<name>.yml`, so a
+ * name carrying path separators or dot segments could traverse elsewhere. A
+ * bare name (`Local`) and the collection-relative forms (`Local.yml`,
+ * `environments/Local.yml`) all reduce to the same name; every other shape is
+ * rejected. The resolved file is finally confirmed to stay within the
+ * collection root. Existing environment directories and files must be direct
+ * filesystem entries rather than symbolic links.
+ *
+ * @throws {BrunoMcpError} `INVALID_ENVIRONMENT_NAME` when the reference is
+ *   empty, carries a control character, contains a path separator or dot
+ *   segment, or selects a symbolic link.
+ * @throws {BrunoMcpError} `PATH_OUTSIDE_ROOT` when the resolved environment file
+ *   escapes the collection root (for example via a symlink).
+ */
+function resolveEnvironmentName(
+  root: string,
+  collection: string,
+  reference: string,
+): string {
+  if (hasControlCharacter(reference)) {
+    throw new BrunoMcpError(
+      "INVALID_ENVIRONMENT_NAME",
+      `Environment name ${JSON.stringify(reference)} must not contain control characters.`,
+    );
+  }
+
+  let name = reference.trim();
+
+  const prefix = `${ENVIRONMENTS_DIR}/`;
+  if (name.startsWith(prefix)) {
+    name = name.slice(prefix.length);
+  }
+  if (name.toLowerCase().endsWith(YAML_EXTENSION)) {
+    name = name.slice(0, -YAML_EXTENSION.length);
+  }
+
+  if (name.length === 0) {
+    throw new BrunoMcpError(
+      "INVALID_ENVIRONMENT_NAME",
+      "An environment name must not be empty.",
+    );
+  }
+
+  if (PATH_SEPARATOR.test(name) || name === "." || name === "..") {
+    throw new BrunoMcpError(
+      "INVALID_ENVIRONMENT_NAME",
+      `Environment ${JSON.stringify(reference)} must be a single environment name without path separators or dot segments.`,
+    );
+  }
+
+  const fileName = `${name}${YAML_EXTENSION}`;
+  const relativePath = `${ENVIRONMENTS_DIR}/${fileName}`;
+  const collectionRoot = resolveWithinCollection(root, collection, ".");
+  const environmentsPath = join(collectionRoot, ENVIRONMENTS_DIR);
+  if (
+    isExistingSymbolicLink(environmentsPath) ||
+    isExistingSymbolicLink(join(environmentsPath, fileName))
+  ) {
+    throw new BrunoMcpError(
+      "INVALID_ENVIRONMENT_NAME",
+      `Environment ${JSON.stringify(reference)} must identify a direct environment file, not a symbolic link.`,
+    );
+  }
+
+  resolveWithinCollection(root, collection, relativePath);
+
+  return name;
+}
+
 /**
  * Translate semantic run parameters into the argument array for `bru run`.
  *
@@ -72,8 +238,15 @@ const FORBIDDEN_NAME_CHARS = /[\0\n\r]/;
  * request and simply emits the matching flags; it never consults the
  * `allowDeveloperSandbox` or `allowInsecure` configuration itself.
  *
- * @throws {BrunoMcpError} `PATH_OUTSIDE_ROOT` when a target escapes the
- *   collection root via traversal, an absolute path, or a symlink.
+ * @throws {BrunoMcpError} `INVALID_TARGET` when a target is empty, carries a
+ *   control character, or begins with "-" (which Bruno would parse as an
+ *   option).
+ * @throws {BrunoMcpError} `INVALID_ENVIRONMENT_NAME` when the environment
+ *   reference is empty, carries a control character, or contains a path
+ *   separator or dot segment, or selects a symbolic link.
+ * @throws {BrunoMcpError} `PATH_OUTSIDE_ROOT` when a target or the resolved
+ *   environment file escapes the collection root via traversal, an absolute
+ *   path, or a symlink.
  * @throws {BrunoMcpError} `INVALID_VARIABLE_NAME` when a variable name contains
  *   a NUL, newline, or carriage return.
  */
@@ -84,15 +257,17 @@ export function buildRunArgs(
   const args: string[] = [];
 
   for (const target of params.targets ?? []) {
-    // Verify containment against the collection root before the value is ever
-    // handed to Bruno. Targets may be request files or folders, so no suffix is
-    // required; only the resolved location matters.
-    resolveWithinCollection(context.config.root, params.collection, target);
+    assertRunnableTarget(context.config.root, params.collection, target);
     args.push(target);
   }
 
-  if (params.environment) {
-    args.push("--env", params.environment);
+  if (params.environment !== undefined) {
+    const environment = resolveEnvironmentName(
+      context.config.root,
+      params.collection,
+      params.environment,
+    );
+    args.push(`--env=${environment}`);
   }
 
   for (const [name, value] of Object.entries(params.variables ?? {})) {
@@ -102,9 +277,8 @@ export function buildRunArgs(
         `Environment variable name ${JSON.stringify(name)} must not contain NUL, newline, or carriage return characters.`,
       );
     }
-    // Flag and pair are separate entries; the pair is never split further, so a
-    // value containing "=" stays intact.
-    args.push("--env-var", `${name}=${value}`);
+    // Bind the pair to its option so an option-like variable name remains data.
+    args.push(`--env-var=${name}=${value}`);
   }
 
   if (params.bail) {

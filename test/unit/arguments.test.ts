@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -78,10 +85,8 @@ describe("buildRunArgs", () => {
 
     expect(args).toEqual([
       "Foo.yml",
-      "--env",
-      "Local",
-      "--env-var",
-      "foo=bar",
+      "--env=Local",
+      "--env-var=foo=bar",
       "--bail",
       "--reporter-json",
       REPORT_PATH,
@@ -98,10 +103,8 @@ describe("buildRunArgs", () => {
 
     expect(args).toEqual([
       "Reservation/Retrieve.yml",
-      "--env",
-      "Local",
-      "--env-var",
-      "reservationId=123",
+      "--env=Local",
+      "--env-var=reservationId=123",
       "--bail",
       "--reporter-json",
       REPORT_PATH,
@@ -138,16 +141,14 @@ describe("buildRunArgs", () => {
     expect(args).toEqual(["Hotel", "--reporter-json", REPORT_PATH]);
   });
 
-  it("emits a repeated --env-var flag for each override, preserving order", () => {
+  it("emits a bound --env-var option for each override, preserving order", () => {
     const args = build({
       variables: { reservationId: "123", locale: "en-US" },
     });
 
     expect(args).toEqual([
-      "--env-var",
-      "reservationId=123",
-      "--env-var",
-      "locale=en-US",
+      "--env-var=reservationId=123",
+      "--env-var=locale=en-US",
       "--reporter-json",
       REPORT_PATH,
     ]);
@@ -157,8 +158,7 @@ describe("buildRunArgs", () => {
     const args = build({ variables: { token: "a=b=c" } });
 
     expect(args).toEqual([
-      "--env-var",
-      "token=a=b=c",
+      "--env-var=token=a=b=c",
       "--reporter-json",
       REPORT_PATH,
     ]);
@@ -265,12 +265,9 @@ describe("buildRunArgs", () => {
     expect(args).toEqual([
       "Hotel/Search.yml",
       "Hotel",
-      "--env",
-      "Local",
-      "--env-var",
-      "reservationId=123",
-      "--env-var",
-      "locale=en-US",
+      "--env=Local",
+      "--env-var=reservationId=123",
+      "--env-var=locale=en-US",
       "--bail",
       "--tests-only",
       "--delay",
@@ -295,8 +292,7 @@ describe("buildRunArgs", () => {
     for (const arg of args) {
       expect(typeof arg).toBe("string");
     }
-    // Flags and their values are always separate entries, so no single element
-    // is ever a whole command line.
+    // No single element is ever a whole command line.
     expect(args).not.toContain("bru run Hotel/Search.yml --env Local");
     expect(args.some((arg) => arg.includes(" --"))).toBe(false);
   });
@@ -359,13 +355,241 @@ describe("buildRunArgs", () => {
       });
 
       expect(args).toEqual([
-        "--env-var",
-        "with space=a b",
-        "--env-var",
-        "dot.name=",
+        "--env-var=with space=a b",
+        "--env-var=dot.name=",
         "--reporter-json",
         REPORT_PATH,
       ]);
+    });
+
+    it("binds an option-like variable name to the env-var option", () => {
+      expect(build({ variables: { "--sandbox": "developer" } })).toEqual([
+        "--env-var=--sandbox=developer",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+  });
+
+  describe("option-like target rejection", () => {
+    it("rejects a target that is exactly a long option flag", () => {
+      expectErrorCode(
+        () => build({ targets: ["--insecure"] }),
+        "INVALID_TARGET",
+      );
+    });
+
+    it("rejects a target smuggling an option with an '=' value", () => {
+      expectErrorCode(
+        () => build({ targets: ["--sandbox=developer"] }),
+        "INVALID_TARGET",
+      );
+    });
+
+    it("rejects a target smuggling a file-writing reporter option", () => {
+      expectErrorCode(
+        () => build({ targets: ["--reporter-html=/tmp/pwned.html"] }),
+        "INVALID_TARGET",
+      );
+    });
+
+    it("rejects a short-option-like target", () => {
+      expectErrorCode(() => build({ targets: ["-r"] }), "INVALID_TARGET");
+    });
+
+    it("rejects a bare dash target", () => {
+      expectErrorCode(() => build({ targets: ["-"] }), "INVALID_TARGET");
+    });
+
+    it("rejects as soon as one target in a list is option-like", () => {
+      expectErrorCode(
+        () => build({ targets: ["Hotel/Search.yml", "--insecure"] }),
+        "INVALID_TARGET",
+      );
+    });
+
+    it("never emits the injected option when a target is rejected", () => {
+      // A rejected build produces no arguments, so the option can never reach
+      // Bruno and bypass the structured insecure/sandbox policy checks.
+      expect(() => build({ targets: ["--insecure"] })).toThrowError();
+    });
+
+    it("allows a dash that is not the first character of the target", () => {
+      expect(build({ targets: ["Hotel/my-search.yml"] })).toEqual([
+        "Hotel/my-search.yml",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+  });
+
+  describe("target hygiene", () => {
+    it("rejects an empty target", () => {
+      expectErrorCode(() => build({ targets: [""] }), "INVALID_TARGET");
+    });
+
+    it("rejects a target containing a NUL byte", () => {
+      expectErrorCode(
+        () => build({ targets: ["Health\0.yml"] }),
+        "INVALID_TARGET",
+      );
+    });
+
+    it("rejects a target containing a newline", () => {
+      expectErrorCode(
+        () => build({ targets: ["Health\n.yml"] }),
+        "INVALID_TARGET",
+      );
+    });
+  });
+
+  describe("environment normalization and containment", () => {
+    it("accepts a bare environment name", () => {
+      expect(build({ environment: "Local" })).toEqual([
+        "--env=Local",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+
+    it("binds an option-like environment name to the env option", () => {
+      expect(build({ environment: "--sandbox=developer" })).toEqual([
+        "--env=--sandbox=developer",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+
+    it("normalizes a '.yml' suffixed reference to the bare name", () => {
+      expect(build({ environment: "Local.yml" })).toEqual([
+        "--env=Local",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+
+    it("normalizes an 'environments/<name>.yml' reference to the bare name", () => {
+      expect(build({ environment: "environments/Local.yml" })).toEqual([
+        "--env=Local",
+        "--reporter-json",
+        REPORT_PATH,
+      ]);
+    });
+
+    it("rejects a traversal that escapes the environments directory", () => {
+      expectErrorCode(
+        () => build({ environment: "../../../environments/SHARED" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects a traversal that escapes the root entirely", () => {
+      expectErrorCode(
+        () => build({ environment: "../../../../way-outside/ROOTLEAK" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an 'environments/'-prefixed traversal", () => {
+      expectErrorCode(
+        () => build({ environment: "environments/../../etc/passwd" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects a bare parent-dot segment", () => {
+      expectErrorCode(
+        () => build({ environment: ".." }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an environment name containing a separator", () => {
+      expectErrorCode(
+        () => build({ environment: "team/Local" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an environment name containing a control character", () => {
+      expectErrorCode(
+        () => build({ environment: "Lo\0cal" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects a whitespace-only environment reference", () => {
+      expectErrorCode(
+        () => build({ environment: "   " }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an empty environment reference", () => {
+      expectErrorCode(
+        () => build({ environment: "" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects a trailing control character before trimming", () => {
+      expectErrorCode(
+        () => build({ environment: "Local\n" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an environment symlink that remains inside the collection", () => {
+      mkdirSync(join(root, COLLECTION_ID, "environments"), {
+        recursive: true,
+      });
+      writeFileSync(join(root, COLLECTION_ID, "NotAnEnvironment.yml"), "");
+      symlinkSync(
+        join(root, COLLECTION_ID, "NotAnEnvironment.yml"),
+        join(root, COLLECTION_ID, "environments", "Alias.yml"),
+      );
+
+      expectErrorCode(
+        () => build({ environment: "Alias" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects a symlinked environments directory inside the collection", () => {
+      const environmentFiles = join(root, COLLECTION_ID, "environment-files");
+      mkdirSync(environmentFiles, { recursive: true });
+      writeFileSync(join(environmentFiles, "Local.yml"), "");
+      symlinkSync(
+        environmentFiles,
+        join(root, COLLECTION_ID, "environments"),
+        "dir",
+      );
+
+      expectErrorCode(
+        () => build({ environment: "Local" }),
+        "INVALID_ENVIRONMENT_NAME",
+      );
+    });
+
+    it("rejects an environment whose file symlinks outside the collection", () => {
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), "bruno-mcp-out-")));
+      try {
+        mkdirSync(join(root, COLLECTION_ID, "environments"), {
+          recursive: true,
+        });
+        writeFileSync(join(outside, "SHARED.yml"), "");
+        symlinkSync(
+          join(outside, "SHARED.yml"),
+          join(root, COLLECTION_ID, "environments", "Escape.yml"),
+        );
+
+        expectErrorCode(
+          () => build({ environment: "Escape" }),
+          "INVALID_ENVIRONMENT_NAME",
+        );
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
+      }
     });
   });
 });
