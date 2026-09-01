@@ -4,7 +4,10 @@ import {
   BrunoMcpError,
   toMcpErrorContent,
 } from "../../src/bruno/errors.js";
-import { parseYaml } from "../../src/opencollection/parser.js";
+import {
+  parseYaml,
+  stringifyYaml,
+} from "../../src/opencollection/parser.js";
 
 describe("parseYaml", () => {
   it("parses a valid document into a plain object", () => {
@@ -95,5 +98,28 @@ describe("parseYaml", () => {
     } finally {
       emitWarning.mockRestore();
     }
+  });
+});
+
+describe("stringifyYaml", () => {
+  it("emits stable OpenCollection YAML without wrapping long values", () => {
+    const value = {
+      info: { name: "Create User", type: "http" },
+      http: {
+        method: "POST",
+        url: "{{baseUrl}}/users/with/a/path/that/must/remain/on/one/line",
+      },
+      runtime: {
+        scripts: [{ type: "tests", code: "test(\"created\", () => {\n  expect(res.status).to.equal(201);\n});" }],
+      },
+    };
+
+    const source = stringifyYaml(value);
+
+    expect(source).toContain(
+      '  url: "{{baseUrl}}/users/with/a/path/that/must/remain/on/one/line"',
+    );
+    expect(source).toContain("    code: |-\n");
+    expect(parseYaml(source)).toEqual(value);
   });
 });

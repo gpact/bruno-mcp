@@ -4,6 +4,15 @@ import {
   McpServer,
 } from "@modelcontextprotocol/server";
 import type { JSONRPCMessage } from "@modelcontextprotocol/server";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { loadConfig } from "../../src/config/config.js";
@@ -119,7 +128,7 @@ describe("createServer", () => {
 });
 
 describe("tool registration", () => {
-  it("registers the seven required tools over MCP", async () => {
+  it("registers the eight required tools over MCP", async () => {
     const client = await connectClient(createServer(config));
     await initialize(client);
 
@@ -131,6 +140,7 @@ describe("tool registration", () => {
     );
 
     for (const required of [
+      "bruno_create_request",
       "bruno_list_collections",
       "bruno_list_requests",
       "bruno_get_request",
@@ -157,5 +167,75 @@ describe("tool registration", () => {
     expect([...names].sort()).toEqual([...TOOL_NAMES].sort());
 
     await client.close();
+  });
+
+  it("creates a request and reports validation and conflict errors over MCP", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "bruno-mcp-server-create-")));
+    mkdirSync(join(root, "api"));
+    writeFileSync(
+      join(root, "api/opencollection.yml"),
+      "opencollection: 1.0.0\ninfo:\n  name: API\n",
+    );
+    const client = await connectClient(
+      createServer(loadConfig({ BRUNO_MCP_ROOT: root })),
+    );
+
+    try {
+      await initialize(client);
+      const arguments_ = {
+        collection: "api",
+        request: "Users/Create.yml",
+        name: "Create User",
+        method: "POST",
+        url: "{{baseUrl}}/users",
+        body: [
+          {
+            title: "JSON",
+            selected: true,
+            body: { type: "json", data: '{"name":"Ada"}' },
+          },
+          {
+            title: "Form",
+            body: {
+              type: "form-urlencoded",
+              data: [{ name: "name", value: "Ada" }],
+            },
+          },
+        ],
+      };
+
+      const created = await client.request("tools/call", {
+        name: "bruno_create_request",
+        arguments: arguments_,
+      });
+      expect(created.error).toBeUndefined();
+      expect(created.result?.isError).toBeFalsy();
+      expect(created.result).toMatchObject({
+        structuredContent: {
+          collection: "api",
+          path: "Users/Create.yml",
+        },
+      });
+
+      const invalid = await client.request("tools/call", {
+        name: "bruno_create_request",
+        arguments: { ...arguments_, request: "Users/Invalid.yml", url: "" },
+      });
+      expect(invalid.error).toBeUndefined();
+      expect(invalid.result?.isError).toBe(true);
+
+      const conflict = await client.request("tools/call", {
+        name: "bruno_create_request",
+        arguments: arguments_,
+      });
+      expect(conflict.error).toBeUndefined();
+      expect(conflict.result).toMatchObject({
+        isError: true,
+        structuredContent: { code: "REQUEST_ALREADY_EXISTS" },
+      });
+    } finally {
+      await client.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

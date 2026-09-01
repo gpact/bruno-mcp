@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `bruno_create_request` creates full Bruno v4 OpenCollection HTTP requests from
+  structured fields, including authentication, bodies, runtime behavior,
+  settings, examples, documentation, and app data.
+- Safe request creation with collection-bound path validation, missing parent
+  directory creation, nested collection protection, and exclusive no-overwrite
+  writes.
+
 ## [0.1.0] - 2026-08-27
 
 ### Added

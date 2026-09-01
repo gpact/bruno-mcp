@@ -63,6 +63,16 @@ export async function startTestHttpServer(
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
+    if (request.method === "POST" && url.pathname === "/body-echo") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const content = Buffer.concat(chunks).toString("utf8");
+      sendJson(response, 200, { body: JSON.parse(content) });
+      return;
+    }
+
     if (request.method !== "GET") {
       sendJson(response, 405, { error: "method not allowed" });
       return;
