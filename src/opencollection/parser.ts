@@ -1,4 +1,7 @@
-import { parse as parseYamlSource } from "yaml";
+import {
+  parse as parseYamlSource,
+  stringify as stringifyYamlValue,
+} from "yaml";
 
 import { BrunoMcpError } from "../bruno/errors.js";
 
@@ -34,4 +37,14 @@ export function parseYaml(
       { cause },
     );
   }
+}
+
+/** Serialize a value as stable, human-readable OpenCollection YAML. */
+export function stringifyYaml(value: unknown): string {
+  return stringifyYamlValue(value, {
+    defaultStringType: "PLAIN",
+    indent: 2,
+    lineWidth: 0,
+    minContentWidth: 0,
+  });
 }

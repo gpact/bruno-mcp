@@ -242,6 +242,39 @@ Set `includeSource` to `true` to also return the raw YAML source. It defaults to
 so use request paths produced by the listing or search tools and do not embed
 credentials directly in request YAML.
 
+### `bruno_create_request`
+
+Creates a new Bruno v4 OpenCollection HTTP request from structured fields. The
+tool creates missing parent directories, but never overwrites an existing file.
+The request is available to the listing, search, inspection, and execution tools
+immediately after creation.
+
+Required inputs:
+
+- `collection`: collection identifier
+- `request`: normalized path relative to the collection, including `.yml`
+- `name`: request display name
+- `method`: HTTP method
+- `url`: request URL, with Bruno variables stored verbatim
+
+Optional inputs cover the full Bruno v4 HTTP request representation:
+
+- Request metadata: `sequence`, `tags`, and `description`
+- HTTP details: `headers`, query or path `params`, `body`, and `auth`
+- Execution behavior: `runtime` variables, scripts, assertions, and actions
+- Additional data: `settings`, `examples`, `docs`, and `app`
+
+Supported bodies include raw JSON, text, XML, and SPARQL content, URL-encoded
+forms, multipart forms, and files. A request may provide one body or named body
+variants. Authentication supports Bruno's OpenCollection auth types and Bruno's
+Akamai EdgeGrid extension. The advertised MCP input schema describes each nested
+field and validates incompatible variants. Request YAML is serialized and written
+directly; Bruno CLI is not used for file creation.
+
+The path must not target collection metadata, the root `environments` directory,
+or a nested collection. Absolute paths, non-normalized paths, unsupported file
+extensions, traversal outside the collection, and symlink escapes are rejected.
+
 ### `bruno_list_environments`
 
 Lists environments available to a collection without exposing variable values.
@@ -289,10 +322,12 @@ Inputs:
 
 ## Secret handling
 
-> Do not pass credentials or other secrets through `variables`. MCP tool
-> arguments may be visible to the model and host, and overrides are also passed
-> to the Bruno process as arguments. Provide secrets through Bruno's normal
-> environment or process environment mechanisms instead.
+> Do not pass credentials or other secrets through `variables`, request creation
+> fields such as `auth` or `headers`, or other MCP arguments. MCP tool arguments
+> may be visible to the model and host. Created request fields are also persisted
+> to YAML, and variable overrides are passed to the Bruno process as arguments.
+> Provide secrets through Bruno's normal environment or process environment
+> mechanisms instead.
 
 Environment inspection honors `secret: true`, but this marker is not a general
 file-access boundary. `bruno_get_request` returns files without redaction and
@@ -336,9 +371,11 @@ limited to controlled development environments.
   arguments directly to the configured Bruno executable with shell execution
   disabled. It does not expose a generic shell or Bruno CLI command tool, but
   developer-mode Bruno scripts can start processes themselves.
-- **Read-only inspection:** Discovery and inspection do not intentionally create,
-  update, or delete collection files. `bruno_run` delegates to Bruno CLI and can
-  execute scripts with side effects, including persisted variable changes.
+- **Controlled request creation:** Discovery and inspection are read-only.
+  `bruno_create_request` can create new request files and missing parent
+  directories, but uses an exclusive write and never replaces an existing path.
+  `bruno_run` delegates to Bruno CLI and can execute scripts with side effects,
+  including persisted variable changes.
 - **Targeted redaction:** Environment values explicitly marked `secret: true`
   are redacted by environment inspection. Execution reports recursively redact
   common sensitive headers including authorization, cookies, and API key
@@ -387,8 +424,12 @@ npm run check
 
 - Only Bruno OpenCollection YAML is supported; legacy `.bru` collections are
   ignored.
-- No MCP mutation tools are provided for collections, requests, environments,
-  folders, or workspaces. Executed Bruno scripts can still have side effects.
+- Request creation is the only direct MCP mutation. Collection, environment,
+  explicit folder, and workspace creation are not supported, and no update or
+  delete tools are provided. Executed Bruno scripts can still have side effects.
+- Some valid OpenCollection fields are not executed by Bruno CLI 4.0.0. Creation
+  preserves those fields in YAML, but subsequent `bruno_run` behavior remains
+  limited by the configured Bruno CLI version.
 - OpenAPI import and export are not supported.
 - The server does not expose arbitrary Bruno CLI commands or shell execution.
 - Only local stdio MCP transport is supported. Remote and HTTP MCP transports

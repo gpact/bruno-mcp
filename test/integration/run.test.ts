@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import {
   type RunDependencies,
   registerRun,
 } from "../../src/tools/run.js";
+import { createRequest } from "../../src/tools/create-request.js";
 import {
   startTestHttpServer,
   type TestHttpServer,
@@ -120,6 +121,8 @@ async function connectClient(server: McpServer): Promise<{
 async function executeRun(
   arguments_: Record<string, unknown>,
   timeoutMs = 30_000,
+  root = workspaceRoot,
+  collection = "example",
 ): Promise<RunObservation> {
   const tempDirectories: string[] = [];
   const processResults: BruProcessResult[] = [];
@@ -138,7 +141,7 @@ async function executeRun(
     return result;
   };
   const config = loadConfig({
-    BRUNO_MCP_ROOT: workspaceRoot,
+    BRUNO_MCP_ROOT: root,
     BRUNO_MCP_BRU: bruExecutable,
     BRUNO_MCP_TIMEOUT_MS: String(timeoutMs),
   });
@@ -153,7 +156,7 @@ async function executeRun(
     const response = await client.request("tools/call", {
       name: RUN_TOOL_NAME,
       arguments: {
-        collection: "example",
+        collection,
         variables: { baseUrl: httpServer.baseUrl },
         ...arguments_,
       },
@@ -177,6 +180,46 @@ async function executeRun(
 }
 
 describe("bruno_run with Bruno CLI 4.x", () => {
+  it("executes a JSON request created by bruno_create_request", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bruno-mcp-created-request-"));
+    try {
+      await mkdir(join(root, "created"));
+      await writeFile(
+        join(root, "created/opencollection.yml"),
+        "opencollection: 1.0.0\ninfo:\n  name: Created requests\n",
+      );
+      createRequest(loadConfig({ BRUNO_MCP_ROOT: root }), {
+        collection: "created",
+        request: "Echo.yml",
+        name: "Echo JSON body",
+        method: "POST",
+        url: `${httpServer.baseUrl}/body-echo`,
+        headers: [{ name: "Content-Type", value: "application/json" }],
+        body: { type: "json", data: '{"name":"Ada"}' },
+      });
+
+      const { result, processResults } = await executeRun(
+        { targets: ["Echo.yml"], responseBodyMode: "full" },
+        30_000,
+        root,
+        "created",
+      );
+
+      expect(processResults[0]?.exitCode).toBe(0);
+      expect(result.structuredContent).toMatchObject({
+        execution: { status: "passed", exitCode: 0 },
+        results: [
+          {
+            path: "Echo.yml",
+            response: { status: 200, body: { body: { name: "Ada" } } },
+          },
+        ],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("executes a successful request and normalizes its response", async () => {
     const { result, processResults } = await executeRun({
       targets: ["Health.yml"],
