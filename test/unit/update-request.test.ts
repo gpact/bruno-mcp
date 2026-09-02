@@ -360,6 +360,21 @@ describe("updateRequest", () => {
     expect(readFileSync(join(root, "api/Request.yml"), "utf8")).toBe(before);
   });
 
+  it("patches the latest version without a preliminary revision read", () => {
+    const result = updateRequest(config, {
+      collection: "api",
+      request: "Request.yml",
+      expectedRevision: "*",
+      url: "/latest",
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.revision).toMatch(/^[A-Za-z0-9_-]{21}[AQgw]$/);
+    expect(
+      parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8")),
+    ).toMatchObject({ http: { url: "/latest" } });
+  });
+
   it("preserves unrelated legacy values and matches create collection eligibility", () => {
     write(
       "api/opencollection.yml",

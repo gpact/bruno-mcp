@@ -170,6 +170,25 @@ describe("tool registration", () => {
     await client.close();
   });
 
+  it("advertises the mutually exclusive request response modes", async () => {
+    const client = await connectClient(createServer(config));
+    await initialize(client);
+
+    const listed = await client.request("tools/list", {});
+    const tools: Array<{ name: string; inputSchema: unknown }> =
+      listed.result?.tools ?? [];
+    const getRequestTool = tools.find(
+      (tool) => tool.name === "bruno_get_request",
+    );
+    const schema = JSON.stringify(getRequestTool?.inputSchema);
+
+    expect(schema).toContain('"const":"revision"');
+    expect(schema).toContain('"const":"full"');
+    expect(schema).toContain('"const":false');
+
+    await client.close();
+  });
+
   it("creates and updates a request with validation and conflict errors over MCP", async () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "bruno-mcp-server-create-")));
     mkdirSync(join(root, "api"));
@@ -220,10 +239,31 @@ describe("tool registration", () => {
 
       const inspected = await client.request("tools/call", {
         name: "bruno_get_request",
-        arguments: { collection: "api", request: "Users/Create.yml" },
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          responseMode: "revision",
+        },
       });
       const revision = inspected.result?.structuredContent?.revision;
-      expect(revision).toMatch(/^[a-f0-9]{64}$/);
+      expect(inspected.result?.structuredContent).toEqual({
+        collection: "api",
+        path: "Users/Create.yml",
+        revision,
+      });
+      expect(revision).toMatch(/^[A-Za-z0-9_-]{21}[AQgw]$/);
+
+      const invalidInspection = await client.request("tools/call", {
+        name: "bruno_get_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          responseMode: "revision",
+          includeSource: true,
+        },
+      });
+      expect(invalidInspection.error).toBeUndefined();
+      expect(invalidInspection.result?.isError).toBe(true);
 
       const updated = await client.request("tools/call", {
         name: "bruno_update_request",
@@ -257,6 +297,21 @@ describe("tool registration", () => {
       expect(staleUpdate.result).toMatchObject({
         isError: true,
         structuredContent: { code: "REVISION_CONFLICT" },
+      });
+
+      const latestUpdate = await client.request("tools/call", {
+        name: "bruno_update_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          expectedRevision: "*",
+          method: "PUT",
+        },
+      });
+      expect(latestUpdate.error).toBeUndefined();
+      expect(latestUpdate.result?.isError).toBeFalsy();
+      expect(latestUpdate.result?.structuredContent).toMatchObject({
+        changed: true,
       });
 
       const invalidUpdate = await client.request("tools/call", {

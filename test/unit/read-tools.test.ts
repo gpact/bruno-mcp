@@ -315,6 +315,21 @@ describe("getRequest", () => {
       },
     });
     expect(result).not.toHaveProperty("source");
+    expect(result.revision).toMatch(/^[A-Za-z0-9_-]{21}[AQgw]$/);
+  });
+
+  it("returns only the compact preflight fields in revision mode", () => {
+    const result = getRequest(config, {
+      collection: "hotel",
+      request: "Hotel/Search.yml",
+      responseMode: "revision",
+    });
+
+    expect(result).toEqual({
+      collection: "hotel",
+      path: "Hotel/Search.yml",
+      revision: requestRevision(SEARCH_SOURCE),
+    });
   });
 
   it("includes the raw source verbatim when includeSource is true", () => {

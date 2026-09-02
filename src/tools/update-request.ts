@@ -25,7 +25,10 @@ import type { Config } from "../config/config.js";
 import { logger } from "../logger.js";
 import { resolveCollection } from "../opencollection/collection.js";
 import { parseYamlDocument } from "../opencollection/parser.js";
-import { requestRevision } from "../opencollection/revision.js";
+import {
+  REQUEST_REVISION_PATTERN,
+  requestRevision,
+} from "../opencollection/revision.js";
 import { resolveRequest } from "../opencollection/request.js";
 import { relativeToRoot } from "../security/paths.js";
 import {
@@ -51,9 +54,10 @@ const inputSchema = z.strictObject({
       "Existing HTTP request path relative to the collection root, including the .yml extension.",
     ),
   expectedRevision: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .describe("Revision returned by bruno_get_request for this request."),
+    .union([z.string().regex(REQUEST_REVISION_PATTERN), z.literal("*")])
+    .describe(
+      'Revision returned by bruno_get_request, or "*" to patch the latest version without a preliminary read.',
+    ),
   name: REQUEST_FIELD_SCHEMAS.name.optional(),
   method: REQUEST_FIELD_SCHEMAS.method.optional(),
   url: REQUEST_FIELD_SCHEMAS.url.optional(),
@@ -125,7 +129,7 @@ function updateLockedRequest(
   const { collectionRoot, target, path } = resolved;
   const { source } = readVerifiedRequest(collectionRoot, target, input);
   const revision = requestRevision(source);
-  if (revision !== input.expectedRevision) {
+  if (input.expectedRevision !== "*" && revision !== input.expectedRevision) {
     throw revisionConflict(input.request, input.collection);
   }
 
@@ -167,7 +171,14 @@ function updateLockedRequest(
   }
 
   const updatedSource = stringifyUpdatedDocument(document, source);
-  atomicReplaceRequest(config, input, collectionRoot, target, updatedSource);
+  atomicReplaceRequest(
+    config,
+    input,
+    collectionRoot,
+    target,
+    updatedSource,
+    revision,
+  );
 
   return {
     collection: input.collection,
@@ -184,7 +195,7 @@ export function registerUpdateRequest(server: McpServer, config: Config): void {
     {
       title: "Update Bruno request",
       description:
-        "Patch an existing Bruno v4 OpenCollection HTTP request while preserving untouched YAML content. Omitted fields are unchanged, optional null fields are removed, and expectedRevision prevents stale writes. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.",
+        'Patch an existing Bruno v4 OpenCollection HTTP request while preserving untouched YAML content. Omitted fields are unchanged, optional null fields are removed, and expectedRevision prevents stale writes. Use expectedRevision="*" to patch the latest version without first retrieving it. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.',
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...updateRequest(config, input) })),
@@ -326,6 +337,7 @@ function atomicReplaceRequest(
   collectionRoot: string,
   target: string,
   source: string,
+  guardRevision: string,
 ): void {
   const temporaryPath = join(dirname(target), `.bruno-mcp-${randomUUID()}.tmp`);
   let descriptor: number | undefined;
@@ -362,7 +374,7 @@ function atomicReplaceRequest(
     }
 
     const current = readVerifiedRequest(collectionRoot, target, input);
-    if (requestRevision(current.source) !== input.expectedRevision) {
+    if (requestRevision(current.source) !== guardRevision) {
       throw revisionConflict(input.request, input.collection);
     }
 
@@ -378,7 +390,7 @@ function atomicReplaceRequest(
       throw revisionConflict(input.request, input.collection);
     }
     const finalSource = readVerifiedRequest(collectionRoot, target, input).source;
-    if (requestRevision(finalSource) !== input.expectedRevision) {
+    if (requestRevision(finalSource) !== guardRevision) {
       throw revisionConflict(input.request, input.collection);
     }
     renameSync(temporaryPath, target);
