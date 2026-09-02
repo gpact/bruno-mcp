@@ -332,6 +332,19 @@ describe("getRequest", () => {
     });
   });
 
+  it("rejects source inclusion in revision mode for direct callers", () => {
+    expectErrorCode(
+      () =>
+        getRequest(config, {
+          collection: "hotel",
+          request: "Hotel/Search.yml",
+          responseMode: "revision",
+          includeSource: true,
+        }),
+      "INVALID_TARGET",
+    );
+  });
+
   it("includes the raw source verbatim when includeSource is true", () => {
     const result = getRequest(config, {
       collection: "hotel",

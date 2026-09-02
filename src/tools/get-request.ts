@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
+import { BrunoMcpError } from "../bruno/errors.js";
 import type { Config } from "../config/config.js";
 import { resolveCollection } from "../opencollection/collection.js";
 import { parseYaml } from "../opencollection/parser.js";
@@ -32,35 +33,30 @@ const requestInputShape = {
 };
 
 /** Input schema for the `bruno_get_request` tool. */
-const inputSchema = z.union([
-  z.object({
+const inputSchema = z
+  .object({
     ...requestInputShape,
     responseMode: z
-      .literal("revision")
-      .describe(
-        "Return only collection, path, and revision for a compact update preflight.",
-      ),
-    includeSource: z
-      .literal(false)
+      .enum(["full", "revision"])
       .optional()
       .describe(
-        "Must be false or omitted when responseMode is revision.",
+        'Response detail. "full" returns the parsed request and metadata; "revision" returns only collection, path, and revision. Defaults to "full".',
       ),
-  }),
-  z.object({
-    ...requestInputShape,
-    responseMode: z
-      .literal("full")
-      .optional()
-      .describe('Return the parsed request and metadata. Defaults to "full".'),
     includeSource: z
       .boolean()
       .optional()
       .describe(
-        "When true, also return the raw request source text alongside the parsed document. Defaults to false.",
+        'When true, include raw source in full mode. Must be false or omitted when responseMode is "revision".',
       ),
-  }),
-]);
+  })
+  .refine(
+    (input) =>
+      input.responseMode !== "revision" || input.includeSource !== true,
+    {
+      message: 'includeSource cannot be true when responseMode is "revision".',
+      path: ["includeSource"],
+    },
+  );
 
 /** Validated input for {@link getRequest}. */
 export type GetRequestInput = z.infer<typeof inputSchema>;
@@ -110,6 +106,13 @@ export function getRequest(
   config: Config,
   input: GetRequestInput,
 ): GetRequestOutput {
+  if (input.responseMode === "revision" && input.includeSource === true) {
+    throw new BrunoMcpError(
+      "INVALID_TARGET",
+      'includeSource cannot be true when responseMode is "revision".',
+    );
+  }
+
   const collectionRoot = resolveCollection(config.root, input.collection);
   const target = resolveRequest(config.root, input.collection, input.request);
   const path = relativeToRoot(collectionRoot, target);

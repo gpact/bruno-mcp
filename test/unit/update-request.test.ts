@@ -187,6 +187,201 @@ describe("updateRequest", () => {
     expect(getRequest(config, requestInput()).revision).toBe(result.revision);
   });
 
+  it("merges runtime, settings, and app patches without deleting siblings", () => {
+    const source = [
+      "info:",
+      "  name: Nested patches",
+      "  type: http",
+      "http:",
+      "  method: GET",
+      "  url: /old",
+      "runtime:",
+      "  variables:",
+      "    - name: tenant",
+      "      value: acme",
+      "  scripts: # preserve this comment",
+      "    - type: before-request",
+      "      code: setup();",
+      "  assertions:",
+      "    - expression: res.status",
+      "      operator: eq",
+      "      value: \"200\"",
+      "  actions: []",
+      "  extension: keep",
+      "settings:",
+      "  encodeUrl: true",
+      "  timeout: 1000",
+      "  followRedirects: inherit",
+      "  extension: keep",
+      "app:",
+      "  enabled: false",
+      "  code: old();",
+      "  extension: keep",
+      "",
+    ].join("\n");
+    write("api/Request.yml", source);
+
+    updateRequest(
+      config,
+      requestInput({
+        runtime: {
+          assertions: [
+            { expression: "res.status", operator: "eq", value: "201" },
+          ],
+        },
+        settings: { timeout: 5_000 },
+        app: { enabled: true },
+      }),
+    );
+
+    const updatedSource = readFileSync(join(root, "api/Request.yml"), "utf8");
+    expect(parseYaml(updatedSource)).toEqual({
+      info: { name: "Nested patches", type: "http" },
+      http: { method: "GET", url: "/old" },
+      runtime: {
+        variables: [{ name: "tenant", value: "acme" }],
+        scripts: [{ type: "before-request", code: "setup();" }],
+        assertions: [
+          { expression: "res.status", operator: "eq", value: "201" },
+        ],
+        actions: [],
+        extension: "keep",
+      },
+      settings: {
+        encodeUrl: true,
+        timeout: 5_000,
+        followRedirects: "inherit",
+        extension: "keep",
+      },
+      app: { enabled: true, code: "old();", extension: "keep" },
+    });
+    expect(updatedSource).toContain("# preserve this comment");
+  });
+
+  it("removes nested fields with null while preserving their parent mappings", () => {
+    write(
+      "api/Request.yml",
+      [
+        "info:",
+        "  name: Nested removal",
+        "  type: http",
+        "http:",
+        "  method: GET",
+        "  url: /old",
+        "runtime:",
+        "  variables: []",
+        "  assertions: []",
+        "settings:",
+        "  timeout: 1000",
+        "  followRedirects: true",
+        "app:",
+        "  enabled: true",
+        "  code: old();",
+        "",
+      ].join("\n"),
+    );
+
+    updateRequest(
+      config,
+      requestInput({
+        runtime: { assertions: null },
+        settings: { timeout: null },
+        app: { code: null },
+      }),
+    );
+
+    expect(parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8"))).toEqual(
+      {
+        info: { name: "Nested removal", type: "http" },
+        http: { method: "GET", url: "/old" },
+        runtime: { variables: [] },
+        settings: { followRedirects: true },
+        app: { enabled: true },
+      },
+    );
+  });
+
+  it("retains an empty mapping after removing its final nested field", () => {
+    write(
+      "api/Request.yml",
+      "info:\n  name: Empty runtime\n  type: http\nhttp:\n  method: GET\n  url: /old\nruntime:\n  assertions: []\n",
+    );
+
+    updateRequest(config, requestInput({ runtime: { assertions: null } }));
+
+    expect(parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8"))).toEqual(
+      {
+        info: { name: "Empty runtime", type: "http" },
+        http: { method: "GET", url: "/old" },
+        runtime: {},
+      },
+    );
+  });
+
+  it("does not rewrite nested semantic no-ops", () => {
+    const source = [
+      "info:",
+      "  name: Nested no-op",
+      "  type: http",
+      "http:",
+      "  method: GET",
+      "  url: /old",
+      "runtime:",
+      "  assertions: []",
+      "settings:",
+      "  timeout: 1000",
+      "app:",
+      "  enabled: true",
+      "",
+    ].join("\n");
+    write("api/Request.yml", source);
+
+    const result = updateRequest(
+      config,
+      requestInput({
+        runtime: { assertions: [] },
+        settings: { timeout: 1_000 },
+        app: { enabled: true },
+      }),
+    );
+
+    expect(result.changed).toBe(false);
+    expect(readFileSync(join(root, "api/Request.yml"), "utf8")).toBe(source);
+  });
+
+  it("treats an empty nested patch as a no-op for a legacy scalar", () => {
+    const source = `${REQUEST_SOURCE}runtime: legacy\n`;
+    write("api/Request.yml", source);
+
+    const result = updateRequest(
+      config,
+      requestInput({ runtime: {}, url: "/new" }),
+    );
+
+    expect(result.changed).toBe(true);
+    expect(parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8"))).toMatchObject(
+      {
+        http: { url: "/new" },
+        runtime: "legacy",
+      },
+    );
+  });
+
+  it.each([
+    ["runtime", { runtime: { assertions: [] } }],
+    ["settings", { settings: { timeout: 1_000 } }],
+    ["app", { app: { enabled: true } }],
+  ])("rejects a nested %s patch when the current value is not a mapping", (field, patch) => {
+    const source = `${REQUEST_SOURCE}${field}: legacy\n`;
+    write("api/Request.yml", source);
+
+    expectErrorCode(
+      () => updateRequest(config, requestInput(patch)),
+      "INVALID_MUTATION_TARGET",
+    );
+    expect(readFileSync(join(root, "api/Request.yml"), "utf8")).toBe(source);
+  });
+
   it("removes optional fields when their patches are null", () => {
     write(
       "api/Request.yml",
@@ -204,11 +399,17 @@ describe("updateRequest", () => {
         "  params: []",
         "  body: { type: text, data: old }",
         "  auth: inherit",
-        "runtime: {}",
-        "settings: {}",
+        "runtime:",
+        "  variables: []",
+        "  extension: keep",
+        "settings:",
+        "  timeout: 1000",
+        "  extension: keep",
         "examples: []",
         "docs: Old docs",
-        "app: {}",
+        "app:",
+        "  enabled: true",
+        "  extension: keep",
         "extension: keep",
         "",
       ].join("\n"),

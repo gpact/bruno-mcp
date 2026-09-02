@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compact source revisions and revision-only responses from
   `bruno_get_request`, semantic no-op detection, optional latest-version updates,
   and atomic request replacement with file-mode preservation.
+- Nested patches for request runtime, settings, and app blocks preserve omitted
+  sibling fields while replacing explicitly supplied child arrays.
 
 ## [0.1.0] - 2026-08-27
 

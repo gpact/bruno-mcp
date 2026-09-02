@@ -42,6 +42,84 @@ import { jsonResult, runTool } from "./result.js";
 /** MCP tool name. */
 export const UPDATE_REQUEST_TOOL_NAME = "bruno_update_request";
 
+const runtimePatchSchema = z
+  .strictObject({
+    variables: REQUEST_FIELD_SCHEMAS.runtime.shape.variables
+      .unwrap()
+      .nullable()
+      .optional()
+      .describe(
+        "Replace the runtime variables array, remove it with null, or omit it to preserve the current value.",
+      ),
+    scripts: REQUEST_FIELD_SCHEMAS.runtime.shape.scripts
+      .unwrap()
+      .nullable()
+      .optional()
+      .describe(
+        "Replace the runtime scripts array, remove it with null, or omit it to preserve the current value.",
+      ),
+    assertions: REQUEST_FIELD_SCHEMAS.runtime.shape.assertions
+      .unwrap()
+      .nullable()
+      .optional()
+      .describe(
+        "Replace the runtime assertions array, remove it with null, or omit it to preserve the current value.",
+      ),
+    actions: REQUEST_FIELD_SCHEMAS.runtime.shape.actions
+      .unwrap()
+      .nullable()
+      .optional()
+      .describe(
+        "Replace the runtime actions array, remove it with null, or omit it to preserve the current value.",
+      ),
+  })
+  .describe(
+    "Nested runtime patch. Omitted children are preserved; null children are removed. Null removes the whole runtime block.",
+  );
+
+const settingsPatchSchema = z
+  .strictObject({
+    encodeUrl: REQUEST_FIELD_SCHEMAS.settings.shape.encodeUrl
+      .unwrap()
+      .nullable()
+      .optional(),
+    timeout: REQUEST_FIELD_SCHEMAS.settings.shape.timeout
+      .unwrap()
+      .nullable()
+      .optional(),
+    followRedirects: REQUEST_FIELD_SCHEMAS.settings.shape.followRedirects
+      .unwrap()
+      .nullable()
+      .optional(),
+    forwardAuthorizationHeader:
+      REQUEST_FIELD_SCHEMAS.settings.shape.forwardAuthorizationHeader
+        .unwrap()
+        .nullable()
+        .optional(),
+    maxRedirects: REQUEST_FIELD_SCHEMAS.settings.shape.maxRedirects
+      .unwrap()
+      .nullable()
+      .optional(),
+  })
+  .describe(
+    "Nested settings patch. Omitted children are preserved; null children are removed. Null removes the whole settings block.",
+  );
+
+const appPatchSchema = z
+  .strictObject({
+    enabled: REQUEST_FIELD_SCHEMAS.app.shape.enabled
+      .unwrap()
+      .nullable()
+      .optional(),
+    code: REQUEST_FIELD_SCHEMAS.app.shape.code
+      .unwrap()
+      .nullable()
+      .optional(),
+  })
+  .describe(
+    "Nested app patch. Omitted children are preserved; null children are removed. Null removes the whole app block.",
+  );
+
 const inputSchema = z.strictObject({
   collection: z
     .string()
@@ -68,11 +146,26 @@ const inputSchema = z.strictObject({
   params: REQUEST_FIELD_SCHEMAS.params.nullable().optional(),
   body: REQUEST_FIELD_SCHEMAS.body.nullable().optional(),
   auth: REQUEST_FIELD_SCHEMAS.auth.nullable().optional(),
-  runtime: REQUEST_FIELD_SCHEMAS.runtime.nullable().optional(),
-  settings: REQUEST_FIELD_SCHEMAS.settings.nullable().optional(),
+  runtime: runtimePatchSchema
+    .nullable()
+    .optional()
+    .describe(
+      "Nested runtime patch. Omitted children are preserved, null children are removed, and null removes the whole runtime block.",
+    ),
+  settings: settingsPatchSchema
+    .nullable()
+    .optional()
+    .describe(
+      "Nested settings patch. Omitted children are preserved, null children are removed, and null removes the whole settings block.",
+    ),
   examples: REQUEST_FIELD_SCHEMAS.examples.nullable().optional(),
   docs: REQUEST_FIELD_SCHEMAS.docs.nullable().optional(),
-  app: REQUEST_FIELD_SCHEMAS.app.nullable().optional(),
+  app: appPatchSchema
+    .nullable()
+    .optional()
+    .describe(
+      "Nested app patch. Omitted children are preserved, null children are removed, and null removes the whole app block.",
+    ),
 });
 
 /** Validated input for {@link updateRequest}. */
@@ -106,6 +199,17 @@ const PATCH_PATHS = {
 
 type PatchField = keyof typeof PATCH_PATHS;
 const PATCH_FIELDS = Object.keys(PATCH_PATHS) as PatchField[];
+const NESTED_PATCH_KEYS = {
+  runtime: ["variables", "scripts", "assertions", "actions"],
+  settings: [
+    "encodeUrl",
+    "timeout",
+    "followRedirects",
+    "forwardAuthorizationHeader",
+    "maxRedirects",
+  ],
+  app: ["enabled", "code"],
+} as const;
 
 /** Patch an existing Bruno v4 OpenCollection HTTP request in place. */
 export function updateRequest(
@@ -153,6 +257,16 @@ function updateLockedRequest(
       continue;
     }
 
+    if (field === "runtime" || field === "settings" || field === "app") {
+      if (!isRecord(value)) {
+        throw new Error(`Validated ${field} patch is not an object`);
+      }
+      changed =
+        applyNestedObjectPatch(document, current, fieldPath, value, field) ||
+        changed;
+      continue;
+    }
+
     if (exists && isDeepStrictEqual(valueAtPath(current, fieldPath), value)) {
       continue;
     }
@@ -195,7 +309,7 @@ export function registerUpdateRequest(server: McpServer, config: Config): void {
     {
       title: "Update Bruno request",
       description:
-        'Patch an existing Bruno v4 OpenCollection HTTP request while preserving untouched YAML content. Omitted fields are unchanged, optional null fields are removed, and expectedRevision prevents stale writes. Use expectedRevision="*" to patch the latest version without first retrieving it. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.',
+        'Patch an existing Bruno v4 OpenCollection HTTP request while preserving untouched YAML content. Runtime, settings, and app objects preserve omitted children; other supplied fields replace their whole value. Optional null fields are removed, and expectedRevision prevents stale writes. Use expectedRevision="*" to patch the latest version without first retrieving it. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.',
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...updateRequest(config, input) })),
@@ -298,6 +412,58 @@ function setDocumentValue(
   }
 
   document.setIn(path, replacement);
+}
+
+function applyNestedObjectPatch(
+  document: ReturnType<typeof parseYamlDocument>,
+  current: Record<string, unknown>,
+  path: readonly string[],
+  patch: Record<string, unknown>,
+  field: "runtime" | "settings" | "app",
+): boolean {
+  const entries = Object.entries(patch).filter(([, value]) => value !== undefined);
+  if (entries.length === 0) return false;
+
+  const allowedKeys = NESTED_PATCH_KEYS[field] as readonly string[];
+  const unsupportedKey = entries.find(([key]) => !allowedKeys.includes(key));
+  if (unsupportedKey !== undefined) {
+    throw new Error(`Validated ${field} patch contains an unsupported field`);
+  }
+
+  const exists = hasValueAtPath(current, path);
+  if (
+    exists &&
+    (!isRecord(valueAtPath(current, path)) || !isMap(document.getIn(path, true)))
+  ) {
+    throw new BrunoMcpError(
+      "INVALID_MUTATION_TARGET",
+      `Request field "${field}" must be a mapping before it can be patched.`,
+    );
+  }
+
+  let changed = false;
+  for (const [key, value] of entries) {
+    const childPath = [...path, key];
+    const childExists = hasValueAtPath(current, childPath);
+    if (value === null) {
+      if (childExists) {
+        document.deleteIn(childPath);
+        changed = true;
+      }
+      continue;
+    }
+
+    if (
+      childExists &&
+      isDeepStrictEqual(valueAtPath(current, childPath), value)
+    ) {
+      continue;
+    }
+
+    setDocumentValue(document, childPath, value);
+    changed = true;
+  }
+  return changed;
 }
 
 function stringifyUpdatedDocument(

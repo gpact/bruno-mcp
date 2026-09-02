@@ -298,12 +298,19 @@ Required inputs:
   the latest version without a preliminary read
 
 Every structured field accepted by `bruno_create_request` can be supplied as a
-patch. Omitted fields remain unchanged. `name`, `method`, and `url` accept only
-concrete non-blank replacements. Supplying `null` for another top-level request
-field removes that field from the YAML. Supplied arrays replace the whole array;
-individual array-entry operations are not supported. A field cannot be removed
-when doing so would leave an alias without its YAML anchor; that patch is rejected
-as an invalid mutation target.
+patch. Omitted top-level fields remain unchanged. `runtime`, `settings`, and
+`app` are nested patches: omitted children remain unchanged, a child set to
+`null` is removed, and supplied child arrays replace their whole arrays. Setting
+one of these three top-level fields to `null` removes the whole block. An empty
+nested patch is a no-op, while removing its final child leaves an explicit empty
+mapping.
+
+All other supplied fields replace their whole value. This includes `auth`,
+`body`, structured descriptions, `tags`, `headers`, `params`, and `examples`.
+Individual array-entry operations are not supported. `name`, `method`, and `url`
+accept only concrete non-blank replacements; `null` removes any other optional
+top-level field. A field cannot be removed when doing so would leave an alias
+without its YAML anchor; that patch is rejected as an invalid mutation target.
 
 Updates preserve untouched YAML fields, comments, ordering, scalar styles, line
 endings, and final-newline state where supported by the YAML document model.

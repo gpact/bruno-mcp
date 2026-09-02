@@ -170,21 +170,20 @@ describe("tool registration", () => {
     await client.close();
   });
 
-  it("advertises the mutually exclusive request response modes", async () => {
+  it("advertises every tool with a top-level object input schema", async () => {
     const client = await connectClient(createServer(config));
     await initialize(client);
 
     const listed = await client.request("tools/list", {});
     const tools: Array<{ name: string; inputSchema: unknown }> =
       listed.result?.tools ?? [];
-    const getRequestTool = tools.find(
-      (tool) => tool.name === "bruno_get_request",
-    );
-    const schema = JSON.stringify(getRequestTool?.inputSchema);
-
-    expect(schema).toContain('"const":"revision"');
-    expect(schema).toContain('"const":"full"');
-    expect(schema).toContain('"const":false');
+    for (const tool of tools) {
+      const schema = tool.inputSchema as Record<string, unknown>;
+      expect(schema.type, tool.name).toBe("object");
+      expect(schema, tool.name).not.toHaveProperty("oneOf");
+      expect(schema, tool.name).not.toHaveProperty("allOf");
+      expect(schema, tool.name).not.toHaveProperty("anyOf");
+    }
 
     await client.close();
   });
@@ -222,6 +221,10 @@ describe("tool registration", () => {
             },
           },
         ],
+        runtime: {
+          variables: [{ name: "tenant", value: "acme" }],
+          scripts: [{ type: "before-request", code: "setup();" }],
+        },
       };
 
       const created = await client.request("tools/call", {
@@ -273,6 +276,11 @@ describe("tool registration", () => {
           expectedRevision: revision,
           name: "Create Customer",
           url: "{{baseUrl}}/customers",
+          runtime: {
+            assertions: [
+              { expression: "res.status", operator: "eq", value: "201" },
+            ],
+          },
         },
       });
       expect(updated.error).toBeUndefined();
@@ -283,6 +291,18 @@ describe("tool registration", () => {
           path: "Users/Create.yml",
           changed: true,
         },
+      });
+
+      const updatedRequest = await client.request("tools/call", {
+        name: "bruno_get_request",
+        arguments: { collection: "api", request: "Users/Create.yml" },
+      });
+      expect(updatedRequest.result?.structuredContent?.document.runtime).toEqual({
+        variables: [{ name: "tenant", value: "acme" }],
+        scripts: [{ type: "before-request", code: "setup();" }],
+        assertions: [
+          { expression: "res.status", operator: "eq", value: "201" },
+        ],
       });
 
       const staleUpdate = await client.request("tools/call", {
