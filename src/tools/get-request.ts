@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Config } from "../config/config.js";
 import { resolveCollection } from "../opencollection/collection.js";
 import { parseYaml } from "../opencollection/parser.js";
+import { requestRevision } from "../opencollection/revision.js";
 import {
   extractRequestMetadata,
   resolveRequest,
@@ -44,6 +45,8 @@ export type GetRequestInput = z.infer<typeof inputSchema>;
 export interface GetRequestOutput {
   collection: string;
   path: string;
+  /** SHA-256 revision of the exact request source. */
+  revision: string;
   metadata: RequestMetadata;
   document: unknown;
   /** Raw request source, present only when `includeSource` is `true`. */
@@ -75,6 +78,7 @@ export function getRequest(
   const output: GetRequestOutput = {
     collection: input.collection,
     path,
+    revision: requestRevision(source),
     metadata,
     document,
   };
@@ -93,7 +97,7 @@ export function registerGetRequest(server: McpServer, config: Config): void {
     {
       title: "Get Bruno request",
       description:
-        "Read a Bruno OpenCollection request and return its parsed YAML representation.",
+        "Read a Bruno OpenCollection request and return its parsed YAML representation plus a stable revision for guarded updates.",
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...getRequest(config, input) })),

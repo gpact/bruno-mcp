@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BrunoMcpError } from "../../src/bruno/errors.js";
 import { type Config, loadConfig } from "../../src/config/config.js";
+import { requestRevision } from "../../src/opencollection/revision.js";
 import {
   LIST_COLLECTIONS_TOOL_NAME,
   listCollections,
@@ -299,6 +300,7 @@ describe("getRequest", () => {
     expect(result).toEqual({
       collection: "hotel",
       path: "Hotel/Search.yml",
+      revision: requestRevision(SEARCH_SOURCE),
       metadata: {
         name: "Search",
         type: "http",
@@ -323,6 +325,7 @@ describe("getRequest", () => {
     });
 
     expect(result.source).toBe(SEARCH_SOURCE);
+    expect(result.revision).toBe(requestRevision(SEARCH_SOURCE));
   });
 
   it("falls back to empty metadata for a file without an info block", () => {

@@ -128,7 +128,7 @@ describe("createServer", () => {
 });
 
 describe("tool registration", () => {
-  it("registers the eight required tools over MCP", async () => {
+  it("registers the nine required tools over MCP", async () => {
     const client = await connectClient(createServer(config));
     await initialize(client);
 
@@ -148,6 +148,7 @@ describe("tool registration", () => {
       "bruno_get_environment",
       "bruno_run",
       "bruno_search_requests",
+      "bruno_update_request",
     ]) {
       expect(names).toContain(required);
     }
@@ -169,7 +170,7 @@ describe("tool registration", () => {
     await client.close();
   });
 
-  it("creates a request and reports validation and conflict errors over MCP", async () => {
+  it("creates and updates a request with validation and conflict errors over MCP", async () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "bruno-mcp-server-create-")));
     mkdirSync(join(root, "api"));
     writeFileSync(
@@ -216,6 +217,59 @@ describe("tool registration", () => {
           path: "Users/Create.yml",
         },
       });
+
+      const inspected = await client.request("tools/call", {
+        name: "bruno_get_request",
+        arguments: { collection: "api", request: "Users/Create.yml" },
+      });
+      const revision = inspected.result?.structuredContent?.revision;
+      expect(revision).toMatch(/^[a-f0-9]{64}$/);
+
+      const updated = await client.request("tools/call", {
+        name: "bruno_update_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          expectedRevision: revision,
+          name: "Create Customer",
+          url: "{{baseUrl}}/customers",
+        },
+      });
+      expect(updated.error).toBeUndefined();
+      expect(updated.result?.isError).toBeFalsy();
+      expect(updated.result).toMatchObject({
+        structuredContent: {
+          collection: "api",
+          path: "Users/Create.yml",
+          changed: true,
+        },
+      });
+
+      const staleUpdate = await client.request("tools/call", {
+        name: "bruno_update_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          expectedRevision: revision,
+          method: "PUT",
+        },
+      });
+      expect(staleUpdate.result).toMatchObject({
+        isError: true,
+        structuredContent: { code: "REVISION_CONFLICT" },
+      });
+
+      const invalidUpdate = await client.request("tools/call", {
+        name: "bruno_update_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          expectedRevision: updated.result?.structuredContent?.revision,
+          name: null,
+        },
+      });
+      expect(invalidUpdate.error).toBeUndefined();
+      expect(invalidUpdate.result?.isError).toBe(true);
 
       const invalid = await client.request("tools/call", {
         name: "bruno_create_request",

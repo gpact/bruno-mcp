@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Safe request creation with collection-bound path validation, missing parent
   directory creation, nested collection protection, and exclusive no-overwrite
   writes.
+- `bruno_update_request` applies guarded, source-preserving patches to existing
+  HTTP requests across the full structured request field set.
+- Stable source revisions from `bruno_get_request`, semantic no-op detection, and
+  atomic request replacement with file-mode preservation.
 
 ## [0.1.0] - 2026-08-27
 
