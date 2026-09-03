@@ -1,7 +1,9 @@
 import {
   parse as parseYamlSource,
+  parseDocument as parseYamlDocumentSource,
   stringify as stringifyYamlValue,
 } from "yaml";
+import type { Document, ParsedNode } from "yaml";
 
 import { BrunoMcpError } from "../bruno/errors.js";
 
@@ -28,6 +30,28 @@ export function parseYaml(
 ): unknown {
   try {
     return parseYamlSource(content, { logLevel: "error" });
+  } catch (error) {
+    const cause = error instanceof Error ? error : new Error(String(error));
+    const where = options.source ? ` (${options.source})` : "";
+    throw new BrunoMcpError(
+      "INVALID_YAML",
+      `Failed to parse YAML${where}.`,
+      { cause },
+    );
+  }
+}
+
+/** Parse YAML into its editable document tree while preserving source details. */
+export function parseYamlDocument(
+  content: string,
+  options: ParseYamlOptions = {},
+): Document.Parsed<ParsedNode> {
+  try {
+    const document = parseYamlDocumentSource(content, { logLevel: "error" });
+    if (document.errors.length > 0) {
+      throw document.errors[0];
+    }
+    return document;
   } catch (error) {
     const cause = error instanceof Error ? error : new Error(String(error));
     const where = options.source ? ` (${options.source})` : "";

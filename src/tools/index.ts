@@ -27,6 +27,10 @@ import {
   SEARCH_REQUESTS_TOOL_NAME,
   registerSearchRequests,
 } from "./search-requests.js";
+import {
+  UPDATE_REQUEST_TOOL_NAME,
+  registerUpdateRequest,
+} from "./update-request.js";
 
 export {
   toToolErrorResult,
@@ -53,6 +57,7 @@ const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerRun,
   registerSearchRequests,
   registerCreateRequest,
+  registerUpdateRequest,
 ];
 
 /**
@@ -69,6 +74,7 @@ export const TOOL_NAMES: readonly string[] = [
   RUN_TOOL_NAME,
   SEARCH_REQUESTS_TOOL_NAME,
   CREATE_REQUEST_TOOL_NAME,
+  UPDATE_REQUEST_TOOL_NAME,
 ];
 
 /**

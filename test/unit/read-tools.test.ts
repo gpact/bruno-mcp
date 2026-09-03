@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BrunoMcpError } from "../../src/bruno/errors.js";
 import { type Config, loadConfig } from "../../src/config/config.js";
+import { requestRevision } from "../../src/opencollection/revision.js";
 import {
   LIST_COLLECTIONS_TOOL_NAME,
   listCollections,
@@ -299,6 +300,7 @@ describe("getRequest", () => {
     expect(result).toEqual({
       collection: "hotel",
       path: "Hotel/Search.yml",
+      revision: requestRevision(SEARCH_SOURCE),
       metadata: {
         name: "Search",
         type: "http",
@@ -313,6 +315,34 @@ describe("getRequest", () => {
       },
     });
     expect(result).not.toHaveProperty("source");
+    expect(result.revision).toMatch(/^[A-Za-z0-9_-]{21}[AQgw]$/);
+  });
+
+  it("returns only the compact preflight fields in revision mode", () => {
+    const result = getRequest(config, {
+      collection: "hotel",
+      request: "Hotel/Search.yml",
+      responseMode: "revision",
+    });
+
+    expect(result).toEqual({
+      collection: "hotel",
+      path: "Hotel/Search.yml",
+      revision: requestRevision(SEARCH_SOURCE),
+    });
+  });
+
+  it("rejects source inclusion in revision mode for direct callers", () => {
+    expectErrorCode(
+      () =>
+        getRequest(config, {
+          collection: "hotel",
+          request: "Hotel/Search.yml",
+          responseMode: "revision",
+          includeSource: true,
+        }),
+      "INVALID_TARGET",
+    );
   });
 
   it("includes the raw source verbatim when includeSource is true", () => {
@@ -323,6 +353,7 @@ describe("getRequest", () => {
     });
 
     expect(result.source).toBe(SEARCH_SOURCE);
+    expect(result.revision).toBe(requestRevision(SEARCH_SOURCE));
   });
 
   it("falls back to empty metadata for a file without an info block", () => {

@@ -230,16 +230,24 @@ Optional `method` and `type` filters use case-insensitive exact matching.
 ### `bruno_get_request`
 
 Reads a Bruno OpenCollection request and returns normalized metadata plus its
-parsed YAML document.
+parsed YAML document. Every result includes a stable 22-character `revision`
+derived from the exact source. Pass that value to `bruno_update_request` to
+prevent stale writes.
 
 Required inputs:
 
 - `collection`: collection identifier
 - `request`: request path relative to the collection
 
-Set `includeSource` to `true` to also return the raw YAML source. It defaults to
-`false`. The parsed document and source are returned without secret redaction,
-so use request paths produced by the listing or search tools and do not embed
+Set `responseMode` to `revision` to return only `collection`, `path`, and
+`revision`. This compact mode is intended for update preflight calls that do not
+need to inspect the request. It defaults to `full`, which returns normalized
+metadata and the parsed document. In full mode, set `includeSource` to `true` to
+also return the raw YAML source. `includeSource` cannot be combined with revision
+mode.
+
+The parsed document and source are returned without secret redaction, so use
+request paths produced by the listing or search tools and do not embed
 credentials directly in request YAML.
 
 ### `bruno_create_request`
@@ -274,6 +282,55 @@ directly; Bruno CLI is not used for file creation.
 The path must not target collection metadata, the root `environments` directory,
 or a nested collection. Absolute paths, non-normalized paths, unsupported file
 extensions, traversal outside the collection, and symlink escapes are rejected.
+
+### `bruno_update_request`
+
+Patches an existing Bruno v4 OpenCollection HTTP request in place. The tool only
+accepts valid HTTP request targets and applies the same path and collection
+eligibility policies as `bruno_create_request`. Renaming and moving files are not
+supported.
+
+Required inputs:
+
+- `collection`: collection identifier
+- `request`: normalized request path relative to the collection, including `.yml`
+- `expectedRevision`: revision returned by `bruno_get_request`, or `*` to patch
+  the latest version without a preliminary read
+
+Every structured field accepted by `bruno_create_request` can be supplied as a
+patch. Omitted top-level fields remain unchanged. `runtime`, `settings`, and
+`app` are nested patches: omitted children remain unchanged, a child set to
+`null` is removed, and supplied child arrays replace their whole arrays. Setting
+one of these three top-level fields to `null` removes the whole block. An empty
+nested patch is a no-op, while removing its final child leaves an explicit empty
+mapping.
+
+All other supplied fields replace their whole value. This includes `auth`,
+`body`, structured descriptions, `tags`, `headers`, `params`, and `examples`.
+Individual array-entry operations are not supported. `name`, `method`, and `url`
+accept only concrete non-blank replacements; `null` removes any other optional
+top-level field. A field cannot be removed when doing so would leave an alias
+without its YAML anchor; that patch is rejected as an invalid mutation target.
+
+Updates preserve untouched YAML fields, comments, ordering, scalar styles, line
+endings, and final-newline state where supported by the YAML document model.
+Unknown and unrelated legacy fields are not revalidated or removed. A semantic
+no-op returns `changed: false` without rewriting the file. A changed request is
+staged beside the original and atomically replaced while preserving its file
+mode. If the source no longer matches `expectedRevision`, the tool returns a
+`REVISION_CONFLICT` error without applying the patch. Concurrent updates from
+Bruno MCP server instances are serialized per request; a currently locked request
+returns `MUTATION_CONFLICT`. Locks are short-lived leases. Locks abandoned by a
+terminated process are recovered after a grace period, and all locks expire after
+24 hours to avoid permanently blocking a request.
+
+When `expectedRevision` is `*`, the server captures the revision after acquiring
+the request lock and applies the same commit-time checks used for explicit
+revisions. This saves the preflight call and remains guarded against concurrent
+Bruno MCP updates. Use an explicit revision when the patch was chosen based on
+previously inspected request content. As with explicit revisions, a
+non-cooperating process that writes in the final interval between the portable
+filesystem check and replacement is outside this coordination guarantee.
 
 ### `bruno_list_environments`
 
@@ -323,9 +380,10 @@ Inputs:
 ## Secret handling
 
 > Do not pass credentials or other secrets through `variables`, request creation
-> fields such as `auth` or `headers`, or other MCP arguments. MCP tool arguments
-> may be visible to the model and host. Created request fields are also persisted
-> to YAML, and variable overrides are passed to the Bruno process as arguments.
+> or update fields such as `auth` or `headers`, or other MCP arguments. MCP tool
+> arguments may be visible to the model and host. Created and updated request
+> fields are also persisted to YAML, and variable overrides are passed to the
+> Bruno process as arguments.
 > Provide secrets through Bruno's normal environment or process environment
 > mechanisms instead.
 
@@ -371,9 +429,11 @@ limited to controlled development environments.
   arguments directly to the configured Bruno executable with shell execution
   disabled. It does not expose a generic shell or Bruno CLI command tool, but
   developer-mode Bruno scripts can start processes themselves.
-- **Controlled request creation:** Discovery and inspection are read-only.
-  `bruno_create_request` can create new request files and missing parent
-  directories, but uses an exclusive write and never replaces an existing path.
+- **Controlled request mutation:** Discovery and inspection are read-only.
+  `bruno_create_request` uses an exclusive write and never replaces an existing
+  path. `bruno_update_request` accepts either the revision returned by inspection
+  or an explicit `*` latest-version guard, rejects non-HTTP targets, and atomically
+  replaces changed files.
   `bruno_run` delegates to Bruno CLI and can execute scripts with side effects,
   including persisted variable changes.
 - **Targeted redaction:** Environment values explicitly marked `secret: true`
@@ -424,9 +484,10 @@ npm run check
 
 - Only Bruno OpenCollection YAML is supported; legacy `.bru` collections are
   ignored.
-- Request creation is the only direct MCP mutation. Collection, environment,
-  explicit folder, and workspace creation are not supported, and no update or
-  delete tools are provided. Executed Bruno scripts can still have side effects.
+- Request creation and in-place HTTP request updates are the only direct MCP
+  mutations. Collection, environment, explicit folder, and workspace mutation
+  are not supported, and no rename, move, or delete tools are provided. Executed
+  Bruno scripts can still have side effects.
 - Some valid OpenCollection fields are not executed by Bruno CLI 4.0.0. Creation
   preserves those fields in YAML, but subsequent `bruno_run` behavior remains
   limited by the configured Bruno CLI version.

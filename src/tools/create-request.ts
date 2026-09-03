@@ -426,7 +426,31 @@ const exampleSchema = z.strictObject({
         .optional(),
     })
     .optional(),
-});
+  });
+
+/** Structured HTTP request fields shared by create and update tools. */
+export const REQUEST_FIELD_SCHEMAS = {
+  name: nonBlankString.describe("Request display name."),
+  method: nonBlankString.describe("HTTP method, for example GET or POST."),
+  url: nonBlankString.describe(
+    "Request URL. Bruno variable references such as {{baseUrl}} are stored verbatim.",
+  ),
+  sequence: z.number().int().positive(),
+  tags: z.array(nonBlankString),
+  description: descriptionSchema,
+  headers: z.array(headerSchema),
+  params: z.array(parameterSchema),
+  body: requestBodySchema,
+  auth: authSchema,
+  runtime: runtimeSchema,
+  settings: settingsSchema,
+  examples: z.array(exampleSchema),
+  docs: z.string(),
+  app: z.strictObject({
+    enabled: z.boolean().optional(),
+    code: z.string().optional(),
+  }),
+} as const;
 
 /** Input schema for the `bruno_create_request` tool. */
 const inputSchema = z.strictObject({
@@ -440,28 +464,21 @@ const inputSchema = z.strictObject({
     .describe(
       "New request path relative to the collection root, including the .yml extension, for example Users/Create User.yml.",
     ),
-  name: nonBlankString.describe("Request display name."),
-  method: nonBlankString.describe("HTTP method, for example GET or POST."),
-  url: nonBlankString.describe(
-    "Request URL. Bruno variable references such as {{baseUrl}} are stored verbatim.",
-  ),
-  sequence: z.number().int().positive().optional(),
-  tags: z.array(nonBlankString).optional(),
-  description: descriptionSchema.optional(),
-  headers: z.array(headerSchema).optional(),
-  params: z.array(parameterSchema).optional(),
-  body: requestBodySchema.optional(),
-  auth: authSchema.optional(),
-  runtime: runtimeSchema.optional(),
-  settings: settingsSchema.optional(),
-  examples: z.array(exampleSchema).optional(),
-  docs: z.string().optional(),
-  app: z
-    .strictObject({
-      enabled: z.boolean().optional(),
-      code: z.string().optional(),
-    })
-    .optional(),
+  name: REQUEST_FIELD_SCHEMAS.name,
+  method: REQUEST_FIELD_SCHEMAS.method,
+  url: REQUEST_FIELD_SCHEMAS.url,
+  sequence: REQUEST_FIELD_SCHEMAS.sequence.optional(),
+  tags: REQUEST_FIELD_SCHEMAS.tags.optional(),
+  description: REQUEST_FIELD_SCHEMAS.description.optional(),
+  headers: REQUEST_FIELD_SCHEMAS.headers.optional(),
+  params: REQUEST_FIELD_SCHEMAS.params.optional(),
+  body: REQUEST_FIELD_SCHEMAS.body.optional(),
+  auth: REQUEST_FIELD_SCHEMAS.auth.optional(),
+  runtime: REQUEST_FIELD_SCHEMAS.runtime.optional(),
+  settings: REQUEST_FIELD_SCHEMAS.settings.optional(),
+  examples: REQUEST_FIELD_SCHEMAS.examples.optional(),
+  docs: REQUEST_FIELD_SCHEMAS.docs.optional(),
+  app: REQUEST_FIELD_SCHEMAS.app.optional(),
 });
 
 /** Validated input for {@link createRequest}. */
@@ -597,7 +614,7 @@ function buildRequestDocument(
   return document;
 }
 
-function assertValidRequestPath(requestPath: string): void {
+export function assertValidRequestPath(requestPath: string): void {
   const segments = requestPath.split("/");
   const invalidSegment = segments.some(
     (segment) => segment === "" || segment === "." || segment === "..",
@@ -623,7 +640,7 @@ function assertValidRequestPath(requestPath: string): void {
   }
 }
 
-function assertOutsideNestedCollection(
+export function assertOutsideNestedCollection(
   collectionRoot: string,
   target: string,
   requestPath: string,
@@ -643,7 +660,10 @@ function assertOutsideNestedCollection(
   }
 }
 
-function assertNoSymlinks(collectionRoot: string, requestPath: string): void {
+export function assertNoSymlinks(
+  collectionRoot: string,
+  requestPath: string,
+): void {
   const segments = requestPath.split("/");
   let current = collectionRoot;
 
