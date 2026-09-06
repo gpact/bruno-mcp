@@ -31,9 +31,10 @@ describe("registerTools", () => {
     expect(registered).toEqual([...TOOL_NAMES]);
   });
 
-  it("exposes the nine required tool names", () => {
+  it("exposes the eleven required tool names", () => {
     expect([...TOOL_NAMES].sort()).toEqual(
       [
+        "bruno_create_environment",
         "bruno_create_request",
         "bruno_get_environment",
         "bruno_get_request",
@@ -42,6 +43,7 @@ describe("registerTools", () => {
         "bruno_list_requests",
         "bruno_run",
         "bruno_search_requests",
+        "bruno_update_environment",
         "bruno_update_request",
       ].sort(),
     );

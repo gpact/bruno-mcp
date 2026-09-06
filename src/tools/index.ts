@@ -2,6 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/server";
 
 import type { Config } from "../config/config.js";
 import {
+  CREATE_ENVIRONMENT_TOOL_NAME,
+  registerCreateEnvironment,
+} from "./create-environment.js";
+import {
   CREATE_REQUEST_TOOL_NAME,
   registerCreateRequest,
 } from "./create-request.js";
@@ -27,6 +31,10 @@ import {
   SEARCH_REQUESTS_TOOL_NAME,
   registerSearchRequests,
 } from "./search-requests.js";
+import {
+  UPDATE_ENVIRONMENT_TOOL_NAME,
+  registerUpdateEnvironment,
+} from "./update-environment.js";
 import {
   UPDATE_REQUEST_TOOL_NAME,
   registerUpdateRequest,
@@ -58,6 +66,8 @@ const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerSearchRequests,
   registerCreateRequest,
   registerUpdateRequest,
+  registerCreateEnvironment,
+  registerUpdateEnvironment,
 ];
 
 /**
@@ -75,6 +85,8 @@ export const TOOL_NAMES: readonly string[] = [
   SEARCH_REQUESTS_TOOL_NAME,
   CREATE_REQUEST_TOOL_NAME,
   UPDATE_REQUEST_TOOL_NAME,
+  CREATE_ENVIRONMENT_TOOL_NAME,
+  UPDATE_ENVIRONMENT_TOOL_NAME,
 ];
 
 /**
