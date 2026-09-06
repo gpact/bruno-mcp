@@ -12,8 +12,13 @@ import type {
   EnvironmentDetail,
   EnvironmentDocument,
   EnvironmentSummary,
+  EnvironmentTypedValue,
+  EnvironmentValueVariant,
   EnvironmentVariable,
+  EnvironmentVariableDescription,
   EnvironmentVariableDetail,
+  EnvironmentVariableValue,
+  EnvironmentValueType,
 } from "./types.js";
 
 /**
@@ -135,11 +140,97 @@ function toVariableDetail(
   variable: EnvironmentVariable,
 ): EnvironmentVariableDetail {
   const secret = variable.secret === true;
+  const description = variableDescription(variable.description);
+  const metadata = {
+    ...(description === undefined ? {} : { description }),
+    ...(typeof variable.disabled === "boolean"
+      ? { disabled: variable.disabled }
+      : {}),
+  };
+
+  if (secret) {
+    return {
+      name: variable.name,
+      value: redactSecretValue(variable.value, true),
+      secret: true,
+      ...(isEnvironmentValueType(variable.type) ? { type: variable.type } : {}),
+      ...metadata,
+    };
+  }
+
   return {
     name: variable.name,
-    value: redactSecretValue(variable.value, secret),
-    secret,
+    value: variableValue(variable.value),
+    secret: false,
+    ...metadata,
   };
+}
+
+function variableDescription(
+  value: unknown,
+): EnvironmentVariableDescription | undefined {
+  if (typeof value === "string") return value;
+  if (
+    isRecord(value) &&
+    typeof value.content === "string" &&
+    typeof value.type === "string"
+  ) {
+    return { content: value.content, type: value.type };
+  }
+  return undefined;
+}
+
+function variableValue(value: unknown): EnvironmentVariableValue {
+  if (Array.isArray(value)) {
+    const variants = value.map(valueVariant);
+    if (variants.every((variant) => variant !== undefined)) {
+      return variants;
+    }
+  }
+  if (
+    isRecord(value) &&
+    isEnvironmentValueType(value.type) &&
+    typeof value.data === "string"
+  ) {
+    return { type: value.type, data: value.data };
+  }
+  return redactSecretValue(value, false);
+}
+
+function valueVariant(value: unknown): EnvironmentValueVariant | undefined {
+  if (!isRecord(value) || typeof value.title !== "string") return undefined;
+  const variantValue = simpleVariableValue(value.value);
+  if (variantValue === undefined) return undefined;
+
+  return {
+    title: value.title,
+    ...(typeof value.selected === "boolean" ? { selected: value.selected } : {}),
+    value: variantValue,
+  };
+}
+
+function simpleVariableValue(
+  value: unknown,
+): string | EnvironmentTypedValue | undefined {
+  if (typeof value === "string") return value;
+  if (
+    isRecord(value) &&
+    isEnvironmentValueType(value.type) &&
+    typeof value.data === "string"
+  ) {
+    return { type: value.type, data: value.data };
+  }
+  return undefined;
+}
+
+function isEnvironmentValueType(value: unknown): value is EnvironmentValueType {
+  return (
+    value === "string" ||
+    value === "number" ||
+    value === "boolean" ||
+    value === "null" ||
+    value === "object"
+  );
 }
 
 /**

@@ -57,25 +57,79 @@ export interface EnvironmentSummary {
 }
 
 /** A single environment variable as stored in an environment document. */
+export type EnvironmentValueType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "null"
+  | "object";
+
+/** An OpenCollection variable value with explicit type metadata. */
+export interface EnvironmentTypedValue {
+  type: EnvironmentValueType;
+  data: string;
+}
+
+/** One selectable alternative for an environment variable value. */
+export interface EnvironmentValueVariant {
+  title: string;
+  selected?: boolean;
+  value: string | EnvironmentTypedValue;
+}
+
+/** A value stored in an OpenCollection environment variable. */
+export type EnvironmentVariableValue =
+  | string
+  | EnvironmentTypedValue
+  | EnvironmentValueVariant[];
+
+/** Optional human-readable variable documentation. */
+export type EnvironmentVariableDescription =
+  | string
+  | { content: string; type: string };
+
 export interface EnvironmentVariable {
   name: string;
-  value?: string;
+  value?: EnvironmentVariableValue;
   /** When `true`, the stored value must never be returned through MCP. */
   secret?: boolean;
+  /** Type metadata for a secret variable whose value is stored externally. */
+  type?: EnvironmentValueType;
+  description?: EnvironmentVariableDescription;
+  disabled?: boolean;
   enabled?: boolean;
   [key: string]: unknown;
 }
 
-/** A single environment variable as exposed through environment inspection. */
-export interface EnvironmentVariableDetail {
+interface EnvironmentVariableDetailBase {
   name: string;
-  /**
-   * Non-secret values are returned verbatim; secret values are always the
-   * redaction placeholder, never the stored value.
-   */
-  value: string;
-  secret: boolean;
+  description?: EnvironmentVariableDescription;
+  disabled?: boolean;
 }
+
+/** A regular environment variable as exposed through environment inspection. */
+export interface RegularEnvironmentVariableDetail
+  extends EnvironmentVariableDetailBase {
+  /**
+   * Non-secret values are returned verbatim, including typed and variant values.
+   */
+  value: EnvironmentVariableValue;
+  secret: false;
+}
+
+/** A secret environment variable as exposed through environment inspection. */
+export interface SecretEnvironmentVariableDetail
+  extends EnvironmentVariableDetailBase {
+  /** Always the redaction placeholder, never the stored value. */
+  value: string;
+  secret: true;
+  type?: EnvironmentValueType;
+}
+
+/** A single environment variable as exposed through environment inspection. */
+export type EnvironmentVariableDetail =
+  | RegularEnvironmentVariableDetail
+  | SecretEnvironmentVariableDetail;
 
 /** Full environment detail, with secret values already redacted. */
 export interface EnvironmentDetail {

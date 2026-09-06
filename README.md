@@ -354,6 +354,60 @@ Required inputs:
 - `environment`: bare name such as `Local` or a collection-relative path such as
   `environments/Local.yml`
 
+### `bruno_create_environment`
+
+Creates a new Bruno environment file within the collection's `environments`
+directory. The tool creates missing `environments` directories, but never
+overwrites an existing file.
+
+Required inputs:
+
+- `collection`: collection identifier
+- `name`: environment name or collection-relative path, such as `Local` or
+  `environments/Local.yml`
+
+Optional input:
+
+- `variables`: array of environment variables to initialize
+
+Variables support plain string values, OpenCollection typed values (`string`,
+`number`, `boolean`, `object`), optional descriptions, and disabled status.
+Selectable variant lists and the `null` type are rejected because Bruno v4 does
+not resolve them to their intended values.
+Marking a variable with `secret: true` defines an externally supplied secret.
+Pass `[REDACTED]` or omit `value` to store its definition without a plaintext
+value. Plaintext secret input is rejected because Bruno v4 does not load secret
+values from environment YAML. Supply secret values through Bruno's secret
+storage or runtime overrides when running Bruno directly.
+
+### `bruno_update_environment`
+
+Replaces the variable definitions of an existing Bruno environment in place. The
+update preserves untouched YAML fields (such as environment color), comments,
+ordering, flow styles, YAML anchors on the variables sequence, line endings,
+UTF-8 BOM, and file permissions.
+
+Required inputs:
+
+- `collection`: collection identifier
+- `name`: environment reference, either a bare name (`Local`) or a
+  collection-relative path (`environments/Local.yml`)
+- `variables`: full replacement array of environment variables
+
+Variables have the same restrictions as `bruno_create_environment`: selectable
+variant lists, the `null` type, and plaintext secret input are rejected.
+
+Every existing secret must remain in the replacement array under its exact
+name with `secret: true`. Renaming, omitting, or converting an existing secret
+to a non-secret is rejected before the file is changed. Use Bruno's application
+to rename or remove secrets so its stored values stay associated with their
+definitions. Secret metadata changes and new secret definitions are allowed.
+
+Secret definitions are always written without a `value` field. Omit `value` or
+pass `[REDACTED]`; updates remove any previous plaintext secret values from the
+replaced variables block. Bruno manages secret values separately in its
+application store. These tools do not read, write, or migrate that store.
+
 ### `bruno_run`
 
 Executes requests, folders, or an entire collection using Bruno CLI v4. It
