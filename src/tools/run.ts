@@ -22,13 +22,13 @@ export const runInputSchema = z.object({
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   targets: z
     .array(z.string())
     .default([])
     .describe(
-      "Request files or folders relative to the collection root. An empty list runs the entire collection.",
+      "Request files or folders relative to collection root, or empty array for entire collection.",
     ),
   environment: z
     .string()
@@ -37,9 +37,7 @@ export const runInputSchema = z.object({
   variables: z
     .record(z.string(), z.string())
     .optional()
-    .describe(
-      "Non-secret environment variable overrides. Do not include credentials or other secrets.",
-    ),
+    .describe("Non-secret environment variable overrides."),
   bail: z
     .boolean()
     .default(false)
@@ -58,19 +56,19 @@ export const runInputSchema = z.object({
     .enum(["safe", "developer"])
     .default("safe")
     .describe(
-      "JavaScript sandbox mode. Developer mode must be enabled by server policy.",
+      "JavaScript sandbox mode (safe or developer).",
     ),
   insecure: z
     .boolean()
     .default(false)
     .describe(
-      "Disable normal TLS certificate verification. Must be enabled by server policy.",
+      "Disable normal TLS certificate verification.",
     ),
   responseBodyMode: z
     .enum(["none", "onFailure", "full"])
     .default("onFailure")
     .describe(
-      "Response bodies to return in the MCP payload: none, only results with failed tests or assertions, or all results.",
+      "When to return response bodies: none, onFailure, or full.",
     ),
   maxResponseBodyBytes: z
     .number()
@@ -78,7 +76,7 @@ export const runInputSchema = z.object({
     .positive()
     .optional()
     .describe(
-      "Maximum serialized UTF-8 size of each returned response body. Oversized bodies are replaced by size metadata.",
+      "Maximum bytes for each returned response body.",
     ),
 });
 
@@ -176,7 +174,7 @@ export function registerRun(
     {
       title: "Run Bruno requests",
       description:
-        "Execute requests, folders, or an entire Bruno collection using Bruno CLI v4. Returns structured request, response, test, and assertion results. Variable overrides must not contain secrets. Do not pass credentials or other secrets through variables. MCP tool arguments may be visible to the model and host. Provide secrets through Bruno's normal environment or process environment mechanisms instead.",
+        "Execute requests, folders, or an entire Bruno collection using Bruno CLI v4. Returns structured execution results. Do not pass credentials or other secrets through variables. MCP tool arguments may be visible to the model and host.",
       inputSchema: runInputSchema,
     },
     (input) => runTool(() => handleRun(config, input, dependencies)),

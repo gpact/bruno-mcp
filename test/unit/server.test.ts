@@ -346,6 +346,20 @@ describe("tool registration", () => {
       expect(invalidUpdate.error).toBeUndefined();
       expect(invalidUpdate.result?.isError).toBe(true);
 
+      const invalidAssertionUpdate = await client.request("tools/call", {
+        name: "bruno_update_request",
+        arguments: {
+          collection: "api",
+          request: "Users/Create.yml",
+          expectedRevision: updated.result?.structuredContent?.revision,
+          runtime: {
+            assertions: [{ expr: "res.status" }],
+          },
+        },
+      });
+      expect(invalidAssertionUpdate.error).toBeUndefined();
+      expect(invalidAssertionUpdate.result?.isError).toBe(true);
+
       const invalid = await client.request("tools/call", {
         name: "bruno_create_request",
         arguments: { ...arguments_, request: "Users/Invalid.yml", url: "" },

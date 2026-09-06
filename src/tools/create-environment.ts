@@ -58,13 +58,8 @@ const nonBlankString = z.string().refine((value) => value.trim().length > 0, {
 
 const environmentVariableCommonShape = {
   name: nonBlankString.describe("Variable name."),
-  description: environmentDescriptionSchema
-    .optional()
-    .describe("Optional description for the variable."),
-  disabled: z
-    .boolean()
-    .optional()
-    .describe("When true, marks the variable as disabled."),
+  description: environmentDescriptionSchema.optional(),
+  disabled: z.boolean().optional(),
 };
 
 export const environmentVariableSchema = z.union([
@@ -72,13 +67,10 @@ export const environmentVariableSchema = z.union([
     ...environmentVariableCommonShape,
     value: environmentVariableValueSchema
       .optional()
-      .describe(
-        "Variable value. Use a string or a typed string, number, boolean, or object. Null types and selectable variants are not supported by Bruno v4.",
-      ),
+      .describe("Variable value."),
     secret: z
       .literal(false)
-      .optional()
-      .describe("When false or omitted, the variable is treated as non-secret."),
+      .optional(),
   }),
   z.strictObject({
     ...environmentVariableCommonShape,
@@ -87,13 +79,11 @@ export const environmentVariableSchema = z.union([
         error: "Omit secret values or use [REDACTED]. Bruno v4 does not load plaintext secrets from environment YAML.",
       })
       .optional()
-      .describe(
-        "Omit or use [REDACTED] to define a secret managed by Bruno. Secret values are never written to environment YAML. Plaintext secret input is not supported.",
-      ),
+      .describe("Omit or use [REDACTED] for secrets."),
     secret: z.literal(true).describe("Must be true for secret variables."),
     type: environmentValueTypeSchema
       .optional()
-      .describe("Type metadata for externally stored secret values."),
+      .describe("Type metadata for secret values."),
   }),
 ]);
 
@@ -102,15 +92,15 @@ const createEnvironmentInput = z.strictObject({
     .string()
     .min(1)
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   name: nonBlankString.describe(
-    "Environment name or collection-relative path, for example Local or environments/Local.yml.",
+    "Environment name or path (e.g. Local or environments/Local.yml).",
   ),
   variables: z
     .array(environmentVariableSchema)
     .optional()
-    .describe("Optional initial list of environment variables."),
+    .describe("Initial list of environment variables."),
 });
 
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInput>;
@@ -251,7 +241,7 @@ export function registerCreateEnvironment(
     {
       title: "Create Bruno environment",
       description:
-        "Create a new Bruno environment YAML file using string or typed values. Selectable variants, null types, and plaintext secret input are not supported by Bruno v4. Omit secret values or pass [REDACTED] to create secret definitions whose values must be supplied externally.",
+        "Create a new Bruno environment file. Secret values must be omitted or [REDACTED].",
       inputSchema: createEnvironmentInput,
     },
     (input) => runTool(() => jsonResult({ ...createEnvironment(config, input) })),

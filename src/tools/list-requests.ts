@@ -20,25 +20,25 @@ const inputSchema = z.object({
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name. It may be nested, for example collections/hotel.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   query: z
     .string()
     .optional()
     .describe(
-      "Case-insensitive substring filter matched against each request's name, path, and URL.",
+      "Case-insensitive substring filter for request name, path, and URL.",
     ),
   method: z
     .string()
     .optional()
     .describe(
-      "Filter to requests with this HTTP method (case-insensitive), for example GET or POST.",
+      "Filter by HTTP method (e.g. GET or POST).",
     ),
   type: z
     .string()
     .optional()
     .describe(
-      "Filter to requests of this type (case-insensitive), for example http or graphql.",
+      "Filter by request type (e.g. http or graphql).",
     ),
 });
 
@@ -87,7 +87,7 @@ export function registerListRequests(server: McpServer, config: Config): void {
     {
       title: "List Bruno requests",
       description:
-        "List and search requests in a Bruno OpenCollection collection. Returns request paths, names, types, and HTTP metadata when available.",
+        "List and search requests in a Bruno collection. Returns request paths, names, types, and HTTP metadata.",
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...listRequests(config, input) })),

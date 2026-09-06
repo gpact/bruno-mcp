@@ -49,32 +49,32 @@ const runtimePatchSchema = z
       .nullable()
       .optional()
       .describe(
-        "Replace the runtime variables array, remove it with null, or omit it to preserve the current value.",
+        "Replace the runtime variables array, or null to remove.",
       ),
     scripts: REQUEST_FIELD_SCHEMAS.runtime.shape.scripts
       .unwrap()
       .nullable()
       .optional()
       .describe(
-        "Replace the runtime scripts array, remove it with null, or omit it to preserve the current value.",
+        "Replace the runtime scripts array, or null to remove.",
       ),
     assertions: REQUEST_FIELD_SCHEMAS.runtime.shape.assertions
       .unwrap()
       .nullable()
       .optional()
       .describe(
-        "Replace the runtime assertions array, remove it with null, or omit it to preserve the current value.",
+        "Replace the runtime assertions array, or null to remove.",
       ),
     actions: REQUEST_FIELD_SCHEMAS.runtime.shape.actions
       .unwrap()
       .nullable()
       .optional()
       .describe(
-        "Replace the runtime actions array, remove it with null, or omit it to preserve the current value.",
+        "Replace the runtime actions array, or null to remove.",
       ),
   })
   .describe(
-    "Nested runtime patch. Omitted children are preserved; null children are removed. Null removes the whole runtime block.",
+    "Nested runtime patch. Omitted children are preserved; null removes them.",
   );
 
 const settingsPatchSchema = z
@@ -102,7 +102,7 @@ const settingsPatchSchema = z
       .optional(),
   })
   .describe(
-    "Nested settings patch. Omitted children are preserved; null children are removed. Null removes the whole settings block.",
+    "Nested settings patch. Omitted children are preserved; null removes them.",
   );
 
 const appPatchSchema = z
@@ -117,24 +117,24 @@ const appPatchSchema = z
       .optional(),
   })
   .describe(
-    "Nested app patch. Omitted children are preserved; null children are removed. Null removes the whole app block.",
+    "Nested app patch. Omitted children are preserved; null removes them.",
   );
 
 const inputSchema = z.strictObject({
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   request: z
     .string()
     .describe(
-      "Existing HTTP request path relative to the collection root, including the .yml extension.",
+      "Existing HTTP request path relative to collection root, including .yml extension.",
     ),
   expectedRevision: z
     .union([z.string().regex(REQUEST_REVISION_PATTERN), z.literal("*")])
     .describe(
-      'Revision returned by bruno_get_request, or "*" to patch the latest version without a preliminary read.',
+      'Revision returned by bruno_get_request, or "*" to patch latest version without preflight.',
     ),
   name: REQUEST_FIELD_SCHEMAS.name.optional(),
   method: REQUEST_FIELD_SCHEMAS.method.optional(),
@@ -146,26 +146,11 @@ const inputSchema = z.strictObject({
   params: REQUEST_FIELD_SCHEMAS.params.nullable().optional(),
   body: REQUEST_FIELD_SCHEMAS.body.nullable().optional(),
   auth: REQUEST_FIELD_SCHEMAS.auth.nullable().optional(),
-  runtime: runtimePatchSchema
-    .nullable()
-    .optional()
-    .describe(
-      "Nested runtime patch. Omitted children are preserved, null children are removed, and null removes the whole runtime block.",
-    ),
-  settings: settingsPatchSchema
-    .nullable()
-    .optional()
-    .describe(
-      "Nested settings patch. Omitted children are preserved, null children are removed, and null removes the whole settings block.",
-    ),
+  runtime: runtimePatchSchema.nullable().optional(),
+  settings: settingsPatchSchema.nullable().optional(),
   examples: REQUEST_FIELD_SCHEMAS.examples.nullable().optional(),
   docs: REQUEST_FIELD_SCHEMAS.docs.nullable().optional(),
-  app: appPatchSchema
-    .nullable()
-    .optional()
-    .describe(
-      "Nested app patch. Omitted children are preserved, null children are removed, and null removes the whole app block.",
-    ),
+  app: appPatchSchema.nullable().optional(),
 });
 
 /** Validated input for {@link updateRequest}. */
@@ -309,7 +294,7 @@ export function registerUpdateRequest(server: McpServer, config: Config): void {
     {
       title: "Update Bruno request",
       description:
-        'Patch an existing Bruno v4 OpenCollection HTTP request while preserving untouched YAML content. Runtime, settings, and app objects preserve omitted children; other supplied fields replace their whole value. Optional null fields are removed, and expectedRevision prevents stale writes. Use expectedRevision="*" to patch the latest version without first retrieving it. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.',
+        'Patch an existing Bruno HTTP request while preserving untouched content. Use expectedRevision="*" to patch latest version without preflight.',
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...updateRequest(config, input) })),
