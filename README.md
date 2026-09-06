@@ -397,6 +397,12 @@ Required inputs:
 Variables have the same restrictions as `bruno_create_environment`: selectable
 variant lists, the `null` type, and plaintext secret input are rejected.
 
+Every existing secret must remain in the replacement array under its exact
+name with `secret: true`. Renaming, omitting, or converting an existing secret
+to a non-secret is rejected before the file is changed. Use Bruno's application
+to rename or remove secrets so its stored values stay associated with their
+definitions. Secret metadata changes and new secret definitions are allowed.
+
 Secret definitions are always written without a `value` field. Omit `value` or
 pass `[REDACTED]`; updates remove any previous plaintext secret values from the
 replaced variables block. Bruno manages secret values separately in its

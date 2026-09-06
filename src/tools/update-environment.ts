@@ -51,7 +51,7 @@ const updateEnvironmentInput = z.strictObject({
   variables: z
     .array(environmentVariableSchema)
     .describe(
-      "Full replacement list of environment variables. Secret definitions never include a value in YAML; omit their value or pass [REDACTED]. Existing secret values in YAML are removed when the variables are replaced.",
+      "Full replacement list of environment variables. Keep every existing secret under its exact name with secret: true; renaming, omitting, or converting an existing secret to a non-secret is rejected. Secret definitions never include a value in YAML; omit their value or pass [REDACTED]. Existing secret values in YAML are removed when the variables are replaced.",
     ),
 });
 
@@ -81,6 +81,7 @@ export function updateEnvironment(
       `Environment "${target.name}" in collection "${input.collection}" must be a YAML mapping.`,
     );
   }
+  assertExistingSecretsPreserved(document, input.variables);
   const variables = toStoredEnvironmentVariables(input.variables);
   setVariables(document, variables);
 
@@ -103,11 +104,57 @@ export function registerUpdateEnvironment(
     {
       title: "Update Bruno environment",
       description:
-        "Update an existing Bruno environment YAML file while preserving untouched file structure, comments, and anchors. The supplied variables array replaces the environment variables. Selectable variants, null types, and plaintext secret input are not supported by Bruno v4. Omit secret values or pass [REDACTED]; secret definitions are always written without values, removing any previous plaintext values from the variables block. Manage secret values in Bruno's application store.",
+        "Update an existing Bruno environment YAML file while preserving untouched file structure, comments, and anchors. The supplied variables array replaces the environment variables. Keep every existing secret under its exact name with secret: true; renames, omissions, and conversion to non-secret variables are rejected. Secret metadata changes and new secret definitions are allowed. Selectable variants, null types, and plaintext secret input are not supported by Bruno v4. Omit secret values or pass [REDACTED]; secret definitions are always written without values, removing any previous plaintext values from the variables block. Manage secret values and rename or remove secrets in Bruno's application.",
       inputSchema: updateEnvironmentInput,
     },
     (input) => runTool(() => jsonResult({ ...updateEnvironment(config, input) })),
   );
+}
+
+function assertExistingSecretsPreserved(
+  document: ReturnType<typeof parseYamlDocument>,
+  variables: UpdateEnvironmentInput["variables"],
+): void {
+  const currentDocument = document.toJS() as { variables?: unknown };
+  if (!Array.isArray(currentDocument.variables)) return;
+
+  const existingCounts = new Map<string, number>();
+  for (const variable of currentDocument.variables) {
+    if (
+      typeof variable === "object" &&
+      variable !== null &&
+      variable.secret === true &&
+      typeof variable.name === "string"
+    ) {
+      existingCounts.set(
+        variable.name,
+        (existingCounts.get(variable.name) ?? 0) + 1,
+      );
+    }
+  }
+
+  const replacementCounts = new Map<string, number>();
+  const regularNames = new Set<string>();
+  for (const variable of variables) {
+    if (variable.secret === true) {
+      replacementCounts.set(
+        variable.name,
+        (replacementCounts.get(variable.name) ?? 0) + 1,
+      );
+    } else {
+      regularNames.add(variable.name);
+    }
+  }
+
+  // Bruno associates stored secret values with their exact variable names.
+  for (const [name, count] of existingCounts) {
+    if ((replacementCounts.get(name) ?? 0) < count || regularNames.has(name)) {
+      throw new BrunoMcpError(
+        "INVALID_MUTATION_TARGET",
+        `Existing secret ${JSON.stringify(name)} must keep its exact name and secret: true. Rename or remove secrets in Bruno's application so its secret store stays synchronized.`,
+      );
+    }
+  }
 }
 
 function setVariables(

@@ -225,6 +225,143 @@ describe("createEnvironment", () => {
 });
 
 describe("updateEnvironment", () => {
+  describe("existing secret names", () => {
+    const source = `name: Local
+variables:
+  - name: sample
+    secret: true
+  - name: endpoint
+    value: /old
+`;
+
+    it.each<{
+      label: string;
+      variables: UpdateEnvironmentInput["variables"];
+    }>([
+      {
+        label: "rename",
+        variables: [{ name: "sample_renamed", secret: true }],
+      },
+      {
+        label: "case change",
+        variables: [{ name: "Sample", secret: true }],
+      },
+      { label: "omission", variables: [] },
+      {
+        label: "explicit conversion to non-secret",
+        variables: [{ name: "sample", secret: false, value: "replacement" }],
+      },
+      {
+        label: "omitted secret flag",
+        variables: [{ name: "sample", value: "[REDACTED]" }],
+      },
+      {
+        label: "non-secret sharing an existing secret name",
+        variables: [
+          { name: "sample", secret: true },
+          { name: "sample", value: "replacement" },
+        ],
+      },
+    ])("rejects $label without touching the file", ({ variables }) => {
+      write("api/environments/Local.yml", source);
+
+      expect(() => updateEnvironment(config, updateInput({ variables }))).toThrow(
+        /Rename or remove secrets in Bruno's application/,
+      );
+      expectErrorCode(
+        () => updateEnvironment(config, updateInput({ variables })),
+        "INVALID_MUTATION_TARGET",
+      );
+      expect(readFileSync(join(root, "api/environments/Local.yml"), "utf8")).toBe(
+        source,
+      );
+      expect(readdirSync(join(root, "api/environments"))).toEqual(["Local.yml"]);
+    });
+
+    it("allows secret metadata edits, reordering, additions, and regular renames", () => {
+      write("api/environments/Local.yml", source);
+      const variables: UpdateEnvironmentInput["variables"] = [
+        { name: "renamedEndpoint", value: "/new" },
+        { name: "newSecret", secret: true },
+        {
+          name: "sample",
+          secret: true,
+          value: "[REDACTED]",
+          description: "Updated description",
+          disabled: true,
+        },
+      ];
+
+      updateEnvironment(config, updateInput({ variables }));
+
+      expect(
+        parseYaml(readFileSync(join(root, "api/environments/Local.yml"), "utf8")),
+      ).toEqual({
+        name: "Local",
+        variables: [
+          { name: "renamedEndpoint", value: "/new" },
+          { name: "newSecret", secret: true },
+          {
+            name: "sample",
+            secret: true,
+            description: "Updated description",
+            disabled: true,
+          },
+        ],
+      });
+    });
+
+    it("rejects renaming one of two secrets with the same name", () => {
+      const duplicated = `name: Local
+variables:
+  - name: sample
+    secret: true
+  - name: sample
+    secret: true
+`;
+      write("api/environments/Local.yml", duplicated);
+
+      expectErrorCode(
+        () => updateEnvironment(
+          config,
+          updateInput({
+            variables: [
+              { name: "sample", secret: true },
+              { name: "sample_renamed", secret: true },
+            ],
+          }),
+        ),
+        "INVALID_MUTATION_TARGET",
+      );
+      expect(readFileSync(join(root, "api/environments/Local.yml"), "utf8")).toBe(
+        duplicated,
+      );
+    });
+
+    it("protects secrets referenced through YAML aliases", () => {
+      const aliased = `name: Local
+definitions: &secrets
+  - name: sample
+    secret: true
+variables: *secrets
+`;
+      write("api/environments/Local.yml", aliased);
+
+      expectErrorCode(
+        () => updateEnvironment(
+          config,
+          updateInput({
+            variables: [{ name: "sample_renamed", secret: true }],
+          }),
+        ),
+        "INVALID_MUTATION_TARGET",
+      );
+      expect(readFileSync(join(root, "api/environments/Local.yml"), "utf8")).toBe(
+        aliased,
+      );
+    });
+  });
+
   it("round-trips typed metadata and removes stored secret values", () => {
     write(
       "api/environments/Local.yml",
