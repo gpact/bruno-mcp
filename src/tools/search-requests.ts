@@ -29,19 +29,19 @@ const inputSchema = z.object({
     .trim()
     .min(1, "Query must not be blank.")
     .describe(
-      "Required case-insensitive substring matched against each request's name, path, and URL.",
+      "Case-insensitive substring filter for request name, path, and URL.",
     ),
   method: z
     .string()
     .optional()
     .describe(
-      "Filter to requests with this HTTP method (case-insensitive), for example GET or POST.",
+      "Filter by HTTP method (e.g. GET or POST).",
     ),
   type: z
     .string()
     .optional()
     .describe(
-      "Filter to requests of this type (case-insensitive), for example http or graphql.",
+      "Filter by request type (e.g. http or graphql).",
     ),
 });
 
@@ -96,7 +96,7 @@ export function registerSearchRequests(server: McpServer, config: Config): void 
     {
       title: "Search Bruno requests",
       description:
-        "Search requests across all Bruno OpenCollection collections in the workspace in a single call. Returns each matching request tagged with its collection id.",
+        "Search requests across all collections in the workspace. Returns matching requests with collection id.",
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...searchRequests(config, input) })),

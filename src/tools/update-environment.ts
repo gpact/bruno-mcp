@@ -40,18 +40,18 @@ const updateEnvironmentInput = z.strictObject({
     .string()
     .min(1)
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   name: z
     .string()
     .min(1)
     .describe(
-      "Environment reference, either a bare name (Local) or a collection-relative path (environments/Local.yml).",
+      "Environment name or path (e.g. Local or environments/Local.yml).",
     ),
   variables: z
     .array(environmentVariableSchema)
     .describe(
-      "Full replacement list of environment variables. Keep every existing secret under its exact name with secret: true; renaming, omitting, or converting an existing secret to a non-secret is rejected. Secret definitions never include a value in YAML; omit their value or pass [REDACTED]. Existing secret values in YAML are removed when the variables are replaced.",
+      "Replacement list of variables. Existing secrets must keep secret: true.",
     ),
 });
 
@@ -104,7 +104,7 @@ export function registerUpdateEnvironment(
     {
       title: "Update Bruno environment",
       description:
-        "Update an existing Bruno environment YAML file while preserving untouched file structure, comments, and anchors. The supplied variables array replaces the environment variables. Keep every existing secret under its exact name with secret: true; renames, omissions, and conversion to non-secret variables are rejected. Secret metadata changes and new secret definitions are allowed. Selectable variants, null types, and plaintext secret input are not supported by Bruno v4. Omit secret values or pass [REDACTED]; secret definitions are always written without values, removing any previous plaintext values from the variables block. Manage secret values and rename or remove secrets in Bruno's application.",
+        "Update an existing Bruno environment file. Existing secrets must be preserved with secret: true.",
       inputSchema: updateEnvironmentInput,
     },
     (input) => runTool(() => jsonResult({ ...updateEnvironment(config, input) })),

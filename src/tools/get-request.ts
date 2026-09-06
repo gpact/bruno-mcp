@@ -23,12 +23,12 @@ const requestInputShape = {
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name. It may be nested, for example collections/hotel.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   request: z
     .string()
     .describe(
-      "Request path relative to the collection root (as returned by bruno_list_requests), for example Hotel/Search.yml.",
+      "Request path relative to collection root (e.g. Users/Create.yml).",
     ),
 };
 
@@ -40,13 +40,13 @@ const inputSchema = z
       .enum(["full", "revision"])
       .optional()
       .describe(
-        'Response detail. "full" returns the parsed request and metadata; "revision" returns only collection, path, and revision. Defaults to "full".',
+        'Detail level: "full" for document and metadata, or "revision" for revision check only.',
       ),
     includeSource: z
       .boolean()
       .optional()
       .describe(
-        'When true, include raw source in full mode. Must be false or omitted when responseMode is "revision".',
+        "Include raw YAML source in full mode.",
       ),
   })
   .refine(
@@ -152,7 +152,7 @@ export function registerGetRequest(server: McpServer, config: Config): void {
     {
       title: "Get Bruno request",
       description:
-        "Read a Bruno OpenCollection request. Use responseMode=revision for a compact guarded-update preflight, or full mode for its parsed YAML representation and metadata.",
+        "Read a Bruno request. Use responseMode=revision for revision check, or full for parsed content.",
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...getRequest(config, input) })),

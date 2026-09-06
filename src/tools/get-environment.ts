@@ -12,12 +12,12 @@ const inputSchema = z.object({
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name. It may be nested, for example collections/hotel.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   environment: z
     .string()
     .describe(
-      "Environment reference, either a bare name (Local) or a collection-relative path (environments/Local.yml).",
+      "Environment name or path (e.g. Local or environments/Local.yml).",
     ),
 });
 

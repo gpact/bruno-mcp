@@ -45,350 +45,84 @@ const nonBlankString = z.string().refine((value) => value.trim().length > 0, {
 const descriptionSchema = z
   .union([
     z.string(),
-    z.strictObject({ content: z.string(), type: nonBlankString }),
+    z.record(z.string(), z.unknown()),
   ])
   .nullable();
-const describedValueSchema = {
-  description: descriptionSchema.optional(),
-  disabled: z.boolean().optional(),
-};
 
 const headerSchema = z.strictObject({
   name: z.string(),
   value: z.string(),
-  ...describedValueSchema,
+  description: descriptionSchema.optional(),
+  disabled: z.boolean().optional(),
 });
-const responseHeaderSchema = z.strictObject({
-  name: z.string(),
-  value: z.string(),
-});
+
 const parameterSchema = z.strictObject({
   name: z.string(),
   value: z.string(),
   type: z.enum(["query", "path"]),
-  ...describedValueSchema,
+  description: descriptionSchema.optional(),
+  disabled: z.boolean().optional(),
 });
-const formEntrySchema = z.strictObject({
-  name: z.string(),
-  value: z.string(),
-  ...describedValueSchema,
-});
-const multipartTextEntrySchema = z.strictObject({
-  name: z.string(),
-  type: z.literal("text"),
-  value: z.string(),
-  contentType: z.string().optional(),
-  ...describedValueSchema,
-});
-const multipartFileEntrySchema = z.strictObject({
-  name: z.string(),
-  type: z.literal("file"),
-  value: z.array(z.string()),
-  contentType: z.string().optional(),
-  ...describedValueSchema,
-});
-const bodySchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    type: z.enum(["json", "text", "xml", "sparql"]),
-    data: z.string(),
-  }),
-  z.strictObject({
-    type: z.literal("form-urlencoded"),
-    data: z.array(formEntrySchema),
-  }),
-  z.strictObject({
-    type: z.literal("multipart-form"),
-    data: z.array(
-      z.discriminatedUnion("type", [
-        multipartTextEntrySchema,
-        multipartFileEntrySchema,
-      ]),
-    ),
-  }),
-  z.strictObject({
-    type: z.literal("file"),
-    data: z.array(
-      z.strictObject({
-        filePath: z.string(),
-        contentType: z.string(),
-        selected: z.boolean(),
-        description: descriptionSchema.optional(),
-      }),
-    ),
-  }),
-]);
-const requestBodySchema = z.union([
-  bodySchema,
-  z
-    .array(
-      z.strictObject({
-        title: z.string(),
-        selected: z.boolean().optional(),
-        body: bodySchema,
-      }),
-    )
-    .min(1),
-]);
-const oauth2CredentialsSchema = z.strictObject({
-  clientId: z.string().optional(),
-  clientSecret: z.string().optional(),
-  placement: z.enum(["basic_auth_header", "body"]).optional(),
-});
-const oauth2AdditionalParameterSchema = z.strictObject({
-  name: z.string().optional(),
-  value: z.string().optional(),
-  placement: z.enum(["header", "query", "body"]).optional(),
-});
-const oauth2TokenConfigSchema = z.strictObject({
-  id: z.string().optional(),
-  placement: z
-    .union([
-      z.strictObject({ header: z.string() }),
-      z.strictObject({ query: z.string() }),
-    ])
-    .optional(),
-  source: z.enum(["access_token", "id_token"]).optional(),
-});
-const oauth2SettingsSchema = z.strictObject({
-  autoFetchToken: z.boolean().optional(),
-  autoRefreshToken: z.boolean().optional(),
-});
-const oauth2TokenParametersSchema = z.strictObject({
-  accessTokenRequest: z.array(oauth2AdditionalParameterSchema).optional(),
-  refreshTokenRequest: z.array(oauth2AdditionalParameterSchema).optional(),
-});
-const oauth2CommonShape = {
-  type: z.literal("oauth2"),
-  accessTokenUrl: z.string().optional(),
-  refreshTokenUrl: z.string().optional(),
-  credentials: oauth2CredentialsSchema.optional(),
-  scope: z.string().optional(),
-  tokenConfig: oauth2TokenConfigSchema.optional(),
-  settings: oauth2SettingsSchema.optional(),
-};
-const oauth2Schema = z.discriminatedUnion("flow", [
-  z.strictObject({
-    ...oauth2CommonShape,
-    flow: z.literal("client_credentials"),
-    additionalParameters: oauth2TokenParametersSchema.optional(),
-  }),
-  z.strictObject({
-    ...oauth2CommonShape,
-    flow: z.literal("resource_owner_password_credentials"),
-    resourceOwner: z
-      .strictObject({
-        username: z.string().optional(),
-        password: z.string().optional(),
-      })
-      .optional(),
-    additionalParameters: oauth2TokenParametersSchema.optional(),
-  }),
-  z.strictObject({
-    ...oauth2CommonShape,
-    flow: z.literal("authorization_code"),
-    authorizationUrl: z.string().optional(),
-    callbackUrl: z.string().optional(),
-    state: z.string().optional(),
-    pkce: z
-      .strictObject({
-        disabled: z.boolean().optional(),
-        method: z.enum(["S256", "plain"]).optional(),
-      })
-      .optional(),
-    additionalParameters: z
-      .strictObject({
-        authorizationRequest: z
-          .array(oauth2AdditionalParameterSchema)
-          .optional(),
-        accessTokenRequest: z
-          .array(oauth2AdditionalParameterSchema)
-          .optional(),
-        refreshTokenRequest: z
-          .array(oauth2AdditionalParameterSchema)
-          .optional(),
-      })
-      .optional(),
-  }),
-  z.strictObject({
-    type: z.literal("oauth2"),
-    flow: z.literal("implicit"),
-    authorizationUrl: z.string().optional(),
-    callbackUrl: z.string().optional(),
-    credentials: z
-      .strictObject({ clientId: z.string().optional() })
-      .optional(),
-    scope: z.string().optional(),
-    state: z.string().optional(),
-    additionalParameters: z
-      .strictObject({
-        authorizationRequest: z
-          .array(oauth2AdditionalParameterSchema)
-          .optional(),
-      })
-      .optional(),
-    tokenConfig: oauth2TokenConfigSchema.optional(),
-    settings: oauth2SettingsSchema.optional(),
-  }),
-]);
+
+const requestBodySchema = z
+  .union([
+    z.record(z.string(), z.unknown()),
+    z.array(z.record(z.string(), z.unknown())),
+  ])
+  .describe("Request body: { type, data } object or list of variants.");
 
 const authSchema = z
   .union([
     z.literal("inherit"),
-    z.strictObject({
-      type: z.literal("awsv4"),
-      accessKeyId: z.string().optional(),
-      secretAccessKey: z.string().optional(),
-      sessionToken: z.string().optional(),
-      service: z.string().optional(),
-      region: z.string().optional(),
-      profileName: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("basic"),
-      username: z.string().optional(),
-      password: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("bearer"),
-      token: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("digest"),
-      username: z.string().optional(),
-      password: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("ntlm"),
-      username: z.string().optional(),
-      password: z.string().optional(),
-      domain: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("wsse"),
-      username: z.string().optional(),
-      password: z.string().optional(),
-    }),
-    z.strictObject({
-      type: z.literal("apikey"),
-      key: z.string().optional(),
-      value: z.string().optional(),
-      placement: z.enum(["header", "query"]).optional(),
-    }),
-    z.strictObject({
-      type: z.literal("oauth1"),
-      consumerKey: z.string().optional(),
-      consumerSecret: z.string().optional(),
-      accessToken: z.string().optional(),
-      accessTokenSecret: z.string().optional(),
-      callbackUrl: z.string().optional(),
-      verifier: z.string().optional(),
-      signatureMethod: z
-        .enum([
-          "HMAC-SHA1",
-          "HMAC-SHA256",
-          "HMAC-SHA512",
-          "RSA-SHA1",
-          "RSA-SHA256",
-          "RSA-SHA512",
-          "PLAINTEXT",
-        ])
-        .optional(),
-      privateKey: z
-        .strictObject({
-          type: z.enum(["file", "text"]),
-          value: z.string(),
-        })
-        .optional(),
-      timestamp: z.string().optional(),
-      nonce: z.string().optional(),
-      version: z.string().optional(),
-      realm: z.string().optional(),
-      placement: z.enum(["header", "query", "body"]).optional(),
-      includeBodyHash: z.boolean().optional(),
-    }),
-    oauth2Schema,
-    z.strictObject({
-      type: z.literal("akamai-edgegrid"),
-      accessToken: z.string().optional(),
-      clientToken: z.string().optional(),
-      clientSecret: z.string().optional(),
-      baseURL: z.string().optional(),
-      nonce: z.string().optional(),
-      timestamp: z.string().optional(),
-      headersToSign: z.string().optional(),
-      maxBodySize: z.number().nonnegative().optional(),
-    }),
+    z.record(z.string(), z.unknown()),
   ])
   .describe(
-    "OpenCollection authentication. Do not pass credentials or other secrets directly through MCP arguments; prefer Bruno variables and environments.",
+    "Authentication config object (e.g. { type: 'bearer', token: '...' }) or 'inherit'. Use Bruno variables for secrets.",
   );
 
-const variableTypedValueSchema = z.strictObject({
-  type: z.enum(["string", "number", "boolean", "null", "object"]),
-  data: z.string(),
+const assertionSchema = z.strictObject({
+  expression: z
+    .string()
+    .describe("Target expression to evaluate (e.g. res.status, res.body.id)."),
+  operator: z
+    .string()
+    .describe("Comparison operator (e.g. eq, neq, contains)."),
+  value: z.string().optional().describe("Expected value to compare against."),
+  disabled: z.boolean().optional(),
+  description: descriptionSchema.optional(),
 });
-const variableValueSchema = z.union([
-  z.string(),
-  variableTypedValueSchema,
-  z.array(
-    z.strictObject({
-      title: z.string(),
-      selected: z.boolean().optional(),
-      value: z.union([z.string(), variableTypedValueSchema]),
-    }),
-  ),
-]);
+
+const scriptSchema = z.strictObject({
+  type: z
+    .enum(["before-request", "after-response", "tests", "hooks"])
+    .describe("Script execution phase."),
+  code: z.string().describe("JavaScript code to execute."),
+});
+
+const runtimeVariableSchema = z.strictObject({
+  name: z.string().describe("Variable name."),
+  value: z.unknown().optional().describe("Variable value."),
+  disabled: z.boolean().optional(),
+  description: descriptionSchema.optional(),
+});
+
 const runtimeSchema = z.strictObject({
   variables: z
-    .array(
-      z.strictObject({
-        name: z.string(),
-        value: variableValueSchema.optional(),
-        ...describedValueSchema,
-      }),
-    )
-    .optional(),
+    .array(runtimeVariableSchema)
+    .optional()
+    .describe("Runtime variables array."),
   scripts: z
-    .array(
-      z.strictObject({
-        type: z.enum(["before-request", "after-response", "tests", "hooks"]),
-        code: z.string(),
-      }),
-    )
-    .optional(),
+    .array(scriptSchema)
+    .optional()
+    .describe("Scripts (before-request, after-response, tests, hooks)."),
   assertions: z
-    .array(
-      z.strictObject({
-        expression: z.string(),
-        operator: z.string(),
-        value: z.string().optional(),
-        ...describedValueSchema,
-      }),
-    )
-    .optional(),
+    .array(assertionSchema)
+    .optional()
+    .describe("Response assertions."),
   actions: z
-    .array(
-      z.strictObject({
-        type: z.literal("set-variable"),
-        phase: z.enum(["before-request", "after-response"]).optional(),
-        selector: z.strictObject({
-          expression: z.string(),
-          method: z.literal("jsonq"),
-        }),
-        variable: z.strictObject({
-          name: z.string(),
-          scope: z.enum([
-            "runtime",
-            "request",
-            "folder",
-            "collection",
-            "environment",
-          ]),
-        }),
-        ...describedValueSchema,
-      }),
-    )
-    .optional(),
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe("Post-response actions."),
 });
 
 const inheritedBooleanSchema = z.union([z.boolean(), z.literal("inherit")]);
@@ -401,55 +135,35 @@ const settingsSchema = z.strictObject({
     .union([z.number().int().nonnegative(), z.literal("inherit")])
     .optional(),
 });
-const exampleSchema = z.strictObject({
-  name: z.string().optional(),
-  description: descriptionSchema.optional(),
-  request: z
-    .strictObject({
-      url: z.string().optional(),
-      method: z.string().optional(),
-      headers: z.array(headerSchema).optional(),
-      params: z.array(parameterSchema).optional(),
-      body: bodySchema.optional(),
-    })
-    .optional(),
-  response: z
-    .strictObject({
-      status: z.number().int().positive().optional(),
-      statusText: z.string().optional(),
-      headers: z.array(responseHeaderSchema).optional(),
-      body: z
-        .strictObject({
-          type: z.enum(["json", "text", "xml", "html", "binary"]),
-          data: z.string(),
-        })
-        .optional(),
-    })
-    .optional(),
-  });
+
+const exampleSchema = z
+  .record(z.string(), z.unknown())
+  .describe("Example request and response definition.");
+
+const appSchema = z.strictObject({
+  enabled: z.boolean().optional(),
+  code: z.string().optional(),
+});
 
 /** Structured HTTP request fields shared by create and update tools. */
 export const REQUEST_FIELD_SCHEMAS = {
   name: nonBlankString.describe("Request display name."),
   method: nonBlankString.describe("HTTP method, for example GET or POST."),
   url: nonBlankString.describe(
-    "Request URL. Bruno variable references such as {{baseUrl}} are stored verbatim.",
+    "Request URL, optionally with Bruno {{variables}}.",
   ),
-  sequence: z.number().int().positive(),
-  tags: z.array(nonBlankString),
-  description: descriptionSchema,
-  headers: z.array(headerSchema),
-  params: z.array(parameterSchema),
+  sequence: z.number().int().positive().describe("Execution sequence order."),
+  tags: z.array(nonBlankString).describe("Request tags."),
+  description: descriptionSchema.describe("Request description."),
+  headers: z.array(headerSchema).describe("Request headers."),
+  params: z.array(parameterSchema).describe("Query and path parameters."),
   body: requestBodySchema,
   auth: authSchema,
   runtime: runtimeSchema,
   settings: settingsSchema,
-  examples: z.array(exampleSchema),
-  docs: z.string(),
-  app: z.strictObject({
-    enabled: z.boolean().optional(),
-    code: z.string().optional(),
-  }),
+  examples: z.array(exampleSchema).describe("Request and response examples."),
+  docs: z.string().describe("Documentation text."),
+  app: appSchema.describe("App extension settings."),
 } as const;
 
 /** Input schema for the `bruno_create_request` tool. */
@@ -457,12 +171,12 @@ const inputSchema = z.strictObject({
   collection: z
     .string()
     .describe(
-      "Collection identifier: the collection's path relative to the workspace root (as returned by bruno_list_collections), not its display name.",
+      "Collection path relative to workspace root (as returned by bruno_list_collections).",
     ),
   request: z
     .string()
     .describe(
-      "New request path relative to the collection root, including the .yml extension, for example Users/Create User.yml.",
+      "New request path relative to collection root, including .yml extension (e.g. Users/Create.yml).",
     ),
   name: REQUEST_FIELD_SCHEMAS.name,
   method: REQUEST_FIELD_SCHEMAS.method,
@@ -578,7 +292,7 @@ export function registerCreateRequest(server: McpServer, config: Config): void {
     {
       title: "Create Bruno request",
       description:
-        "Create a Bruno v4 OpenCollection HTTP request from structured fields. Missing parent folders are created and existing files are never overwritten.",
+        "Create a Bruno HTTP request YAML file. Missing parent folders are created and existing files are not overwritten.",
       inputSchema,
     },
     (input) => runTool(() => jsonResult({ ...createRequest(config, input) })),

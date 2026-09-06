@@ -48,7 +48,7 @@ export function registerListCollections(server: McpServer, config: Config): void
     {
       title: "List Bruno collections",
       description:
-        "List Bruno OpenCollection collections available in the configured workspace.",
+        "List Bruno collections available in the workspace.",
     },
     () => runTool(() => jsonResult({ ...listCollections(config) })),
   );
