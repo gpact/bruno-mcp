@@ -483,11 +483,13 @@ limited to controlled development environments.
   arguments directly to the configured Bruno executable with shell execution
   disabled. It does not expose a generic shell or Bruno CLI command tool, but
   developer-mode Bruno scripts can start processes themselves.
-- **Controlled request mutation:** Discovery and inspection are read-only.
-  `bruno_create_request` uses an exclusive write and never replaces an existing
-  path. `bruno_update_request` accepts either the revision returned by inspection
-  or an explicit `*` latest-version guard, rejects non-HTTP targets, and atomically
-  replaces changed files.
+- **Controlled mutation:** Discovery and inspection are read-only.
+  `bruno_create_request` and `bruno_create_environment` use exclusive writes and
+  never replace existing files. `bruno_update_request` accepts either the
+  revision returned by inspection or an explicit `*` latest-version guard,
+  rejects non-HTTP targets, and atomically replaces changed files.
+  `bruno_update_environment` replaces variable definitions in place while
+  preserving existing secrets.
   `bruno_run` delegates to Bruno CLI and can execute scripts with side effects,
   including persisted variable changes.
 - **Targeted redaction:** Environment values explicitly marked `secret: true`
@@ -538,10 +540,10 @@ npm run check
 
 - Only Bruno OpenCollection YAML is supported; legacy `.bru` collections are
   ignored.
-- Request creation and in-place HTTP request updates are the only direct MCP
-  mutations. Collection, environment, explicit folder, and workspace mutation
-  are not supported, and no rename, move, or delete tools are provided. Executed
-  Bruno scripts can still have side effects.
+- Request and environment creation and in-place updates are the only direct MCP
+  mutations. Collection, explicit folder, and workspace mutation are not
+  supported, and no rename, move, or delete tools are provided. Executed Bruno
+  scripts can still have side effects.
 - Some valid OpenCollection fields are not executed by Bruno CLI 4.0.0. Creation
   preserves those fields in YAML, but subsequent `bruno_run` behavior remains
   limited by the configured Bruno CLI version.

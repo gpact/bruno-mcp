@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-09-06
 
 ### Added
 
@@ -22,6 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and atomic request replacement with file-mode preservation.
 - Nested patches for request runtime, settings, and app blocks preserve omitted
   sibling fields while replacing explicitly supplied child arrays.
+- `bruno_create_environment` creates new Bruno environment files with variable
+  definitions, secret markers, and missing directory creation without
+  overwriting existing environments.
+- `bruno_update_environment` replaces environment variable definitions in place,
+  preserving untouched fields, comments, and formatting while enforcing secret
+  retention and rejecting secret deletion or renaming.
+
+### Changed
+
+- Compact tool descriptions and simplified schemas across all MCP tools to
+  reduce client context and token consumption.
+
+### Security
+
+- Guard `bruno_run` targets and environments against argument injection by
+  binding CLI options with `=` syntax, rejecting option-like targets, and
+  validating environment names against traversal and symlink escapes.
 
 ## [0.1.0] - 2026-08-27
 
@@ -43,5 +60,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Direct process execution without a shell, bounded execution reports, targeted
   secret redaction, and explicit opt-in controls for developer sandbox and
   insecure TLS execution.
-
-[0.1.0]: https://github.com/gpact/bruno-mcp/releases/tag/v0.1.0
