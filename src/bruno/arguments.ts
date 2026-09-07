@@ -39,6 +39,10 @@ export interface RunArgsParams {
   testsOnly?: boolean;
   /** Delay between requests, in milliseconds. */
   delayMs?: number;
+  /** Tags to include in the run. */
+  tags?: string[];
+  /** Tags to exclude from the run. */
+  excludeTags?: string[];
   /** Requested JavaScript sandbox. Developer mode must be pre-authorized. */
   sandbox?: SandboxMode;
   /** Allow insecure TLS. Must be pre-authorized. */
@@ -227,6 +231,51 @@ function resolveEnvironmentName(
 }
 
 /**
+ * Validate a single tag name so it cannot break argument framing or act as a
+ * Bruno CLI option.
+ *
+ * @throws {BrunoMcpError} `INVALID_TAG` when the tag is empty or blank, carries
+ *   a control character, or begins with "-".
+ */
+function assertValidTag(tag: string, fieldName: "tags" | "excludeTags"): string {
+  if (hasControlCharacter(tag)) {
+    throw new BrunoMcpError(
+      "INVALID_TAG",
+      `Tag ${JSON.stringify(tag)} in ${fieldName} must not contain control characters.`,
+    );
+  }
+
+  const trimmed = tag.trim();
+  if (trimmed.length === 0) {
+    throw new BrunoMcpError(
+      "INVALID_TAG",
+      `Tag in ${fieldName} must not be empty.`,
+    );
+  }
+
+  if (trimmed.startsWith(OPTION_PREFIX)) {
+    throw new BrunoMcpError(
+      "INVALID_TAG",
+      `Tag ${JSON.stringify(tag)} in ${fieldName} must not begin with "-".`,
+    );
+  }
+
+  return trimmed;
+}
+
+/** Format and validate a list of tags into a comma-separated argument string. */
+function formatTags(
+  tags: readonly string[],
+  fieldName: "tags" | "excludeTags",
+): string {
+  const validated: string[] = [];
+  for (const tag of tags) {
+    validated.push(assertValidTag(tag, fieldName));
+  }
+  return validated.join(",");
+}
+
+/**
  * Translate semantic run parameters into the argument array for `bru run`.
  *
  * Ordering mirrors the canonical Bruno invocation: targets, environment,
@@ -241,6 +290,8 @@ function resolveEnvironmentName(
  * @throws {BrunoMcpError} `INVALID_TARGET` when a target is empty, carries a
  *   control character, or begins with "-" (which Bruno would parse as an
  *   option).
+ * @throws {BrunoMcpError} `INVALID_TAG` when a tag in tags or excludeTags is
+ *   empty, carries a control character, or begins with "-".
  * @throws {BrunoMcpError} `INVALID_ENVIRONMENT_NAME` when the environment
  *   reference is empty, carries a control character, or contains a path
  *   separator or dot segment, or selects a symbolic link.
@@ -291,6 +342,20 @@ export function buildRunArgs(
 
   if (params.delayMs !== undefined) {
     args.push("--delay", String(params.delayMs));
+  }
+
+  if (params.tags !== undefined && params.tags.length > 0) {
+    const formatted = formatTags(params.tags, "tags");
+    if (formatted.length > 0) {
+      args.push(`--tags=${formatted}`);
+    }
+  }
+
+  if (params.excludeTags !== undefined && params.excludeTags.length > 0) {
+    const formatted = formatTags(params.excludeTags, "excludeTags");
+    if (formatted.length > 0) {
+      args.push(`--exclude-tags=${formatted}`);
+    }
   }
 
   if (params.sandbox === DEVELOPER_SANDBOX) {

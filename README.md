@@ -426,6 +426,8 @@ Inputs:
 | `bail` | `false` | Stops after the first failing request, test, or assertion. |
 | `testsOnly` | `false` | Runs only requests that contain tests or active assertions. |
 | `delayMs` | None | Non-negative delay between requests in milliseconds. |
+| `tags` | None | Tags to include in the run. |
+| `excludeTags` | None | Tags to exclude from the run. |
 | `sandbox` | `safe` | Bruno sandbox mode: `safe` or `developer`. |
 | `insecure` | `false` | Requests disabled TLS certificate verification. |
 | `responseBodyMode` | `onFailure` | Returned response bodies: `none`, `onFailure`, or `full`. |

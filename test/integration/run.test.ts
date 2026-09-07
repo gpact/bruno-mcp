@@ -423,4 +423,67 @@ describe("bruno_run with Bruno CLI 4.x", () => {
       ],
     });
   });
+
+  it("filters requests using tags and excludeTags", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bruno-mcp-tags-"));
+    try {
+      await mkdir(join(root, "tagged"));
+      await writeFile(
+        join(root, "tagged/opencollection.yml"),
+        "opencollection: 1.0.0\ninfo:\n  name: Tagged requests\n",
+      );
+      createRequest(loadConfig({ BRUNO_MCP_ROOT: root }), {
+        collection: "tagged",
+        request: "Smoke.yml",
+        name: "Smoke request",
+        method: "GET",
+        url: `${httpServer.baseUrl}/health`,
+        tags: ["smoke", "fast"],
+      });
+      createRequest(loadConfig({ BRUNO_MCP_ROOT: root }), {
+        collection: "tagged",
+        request: "Billing.yml",
+        name: "Billing request",
+        method: "GET",
+        url: `${httpServer.baseUrl}/health`,
+        tags: ["billing", "slow"],
+      });
+
+      const smokeRun = await executeRun(
+        { tags: ["smoke"] },
+        30_000,
+        root,
+        "tagged",
+      );
+      expect(smokeRun.processResults[0]?.exitCode).toBe(0);
+      const smokePaths = (
+        (
+          smokeRun.result.structuredContent as
+            | { results?: Array<{ path: string }> }
+            | undefined
+        )?.results ?? []
+      ).map((item) => item.path);
+      expect(smokePaths).toContain("Smoke.yml");
+      expect(smokePaths).not.toContain("Billing.yml");
+
+      const excludeRun = await executeRun(
+        { excludeTags: ["slow"] },
+        30_000,
+        root,
+        "tagged",
+      );
+      expect(excludeRun.processResults[0]?.exitCode).toBe(0);
+      const excludePaths = (
+        (
+          excludeRun.result.structuredContent as
+            | { results?: Array<{ path: string }> }
+            | undefined
+        )?.results ?? []
+      ).map((item) => item.path);
+      expect(excludePaths).toContain("Smoke.yml");
+      expect(excludePaths).not.toContain("Billing.yml");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
