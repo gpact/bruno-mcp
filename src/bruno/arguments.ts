@@ -231,7 +231,6 @@ function resolveEnvironmentName(
   return name;
 }
 
-
 /**
  * Translate semantic run parameters into the argument array for `bru run`.
  *

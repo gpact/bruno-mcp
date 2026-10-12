@@ -319,7 +319,7 @@ function buildRequestDocument(
     type: "http",
   };
   if (input.sequence !== undefined) info.seq = input.sequence;
-  if (input.tags !== undefined) info.tags = input.tags;
+  if (input.tags !== undefined && input.tags.length > 0) info.tags = input.tags;
   if (input.description !== undefined) info.description = input.description;
 
   const http: Record<string, unknown> = {

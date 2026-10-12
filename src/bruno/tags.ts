@@ -53,14 +53,25 @@ export function normalizeTag(tag: string, fieldName: TagFieldName): string {
   return trimmed;
 }
 
-/** Normalize and validate tag lists without reordering or deduplicating them. */
+/**
+ * Normalize and validate a tag list, preserving order while dropping duplicates
+ * that collide after normalization (first occurrence wins). This mirrors
+ * Bruno's own handling: `sanitizeTags` in @usebruno/converters deduplicates via
+ * a Set, and the app UI refuses to add a tag that already exists.
+ */
 export function normalizeTags(
   tags: readonly string[],
   fieldName: TagFieldName,
 ): string[] {
+  const seen = new Set<string>();
   const normalized: string[] = [];
   for (const tag of tags) {
-    normalized.push(normalizeTag(tag, fieldName));
+    const value = normalizeTag(tag, fieldName);
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    normalized.push(value);
   }
   return normalized;
 }

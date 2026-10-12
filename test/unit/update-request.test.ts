@@ -187,7 +187,7 @@ describe("updateRequest", () => {
     expect(getRequest(config, requestInput()).revision).toBe(result.revision);
   });
 
-  it("normalizes and patches tags accepted by Bruno UI", () => {
+  it("normalizes, de-duplicates, and patches tags accepted by Bruno UI", () => {
     const result = updateRequest(
       config,
       requestInput({
@@ -214,11 +214,55 @@ describe("updateRequest", () => {
             "équipe",
             "日本語",
             "тест_1",
-            "smoke test",
           ],
         },
       },
     );
+  });
+
+  it("removes tags when patched with an empty list", () => {
+    write(
+      "api/Request.yml",
+      [
+        "info:",
+        "  name: Tagged",
+        "  type: http",
+        '  tags: ["smoke"]',
+        "http:",
+        "  method: GET",
+        "  url: /old",
+        "",
+      ].join("\n"),
+    );
+
+    const result = updateRequest(config, requestInput({ tags: [] }));
+
+    expect(result.changed).toBe(true);
+    expect(
+      parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8")),
+    ).toEqual({
+      info: { name: "Tagged", type: "http" },
+      http: { method: "GET", url: "/old" },
+    });
+  });
+
+  it("reports no change when clearing tags that are already absent", () => {
+    write(
+      "api/Request.yml",
+      [
+        "info:",
+        "  name: Untagged",
+        "  type: http",
+        "http:",
+        "  method: GET",
+        "  url: /old",
+        "",
+      ].join("\n"),
+    );
+
+    const result = updateRequest(config, requestInput({ tags: [] }));
+
+    expect(result.changed).toBe(false);
   });
 
   it.each([

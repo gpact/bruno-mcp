@@ -259,7 +259,7 @@ describe("createRequest", () => {
     });
   });
 
-  it("normalizes and serializes tags accepted by Bruno UI", () => {
+  it("normalizes, de-duplicates, and serializes tags accepted by Bruno UI", () => {
     createRequest(
       config,
       requestInput({
@@ -286,11 +286,19 @@ describe("createRequest", () => {
             "équipe",
             "日本語",
             "тест_1",
-            "smoke test",
           ],
         },
       },
     );
+  });
+
+  it("omits info.tags when the normalized tag list is empty", () => {
+    createRequest(config, requestInput({ request: "EmptyTags.yml", tags: [] }));
+
+    const parsed = parseYaml(
+      readFileSync(join(root, "api/EmptyTags.yml"), "utf8"),
+    ) as { info: Record<string, unknown> };
+    expect(parsed.info.tags).toBeUndefined();
   });
 
   it.each([

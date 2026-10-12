@@ -274,7 +274,8 @@ Optional inputs cover the full Bruno v4 HTTP request representation:
 
 Supported bodies include raw JSON, text, XML, and SPARQL content, URL-encoded
 forms, multipart forms, and files. A request may provide one body or named body
-variants. Request tags may contain only Unicode letters, numbers, spaces, `-`, and `_`.
+variants. Request tags may contain only Unicode letters, numbers, spaces, `-`, and `_`;
+duplicate tags are dropped and an empty list is omitted.
 Authentication supports Bruno's OpenCollection auth types and Bruno's Akamai
 EdgeGrid extension. The advertised MCP input schema describes each nested field
 and validates incompatible variants. Request YAML is serialized and written
@@ -308,7 +309,8 @@ mapping.
 
 All other supplied fields replace their whole value. This includes `auth`,
 `body`, structured descriptions, `tags`, `headers`, `params`, and `examples`.
-Individual array-entry operations are not supported. `name`, `method`, and `url`
+Supplying an empty `tags` list clears all tags, the same as `null`; duplicate
+tags are dropped. Individual array-entry operations are not supported. `name`, `method`, and `url`
 accept only concrete non-blank replacements; `null` removes any other optional
 top-level field. A field cannot be removed when doing so would leave an alias
 without its YAML anchor; that patch is rejected as an invalid mutation target.

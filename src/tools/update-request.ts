@@ -223,7 +223,11 @@ function normalizeUpdateRequestInput(
     return input;
   }
 
-  return { ...input, tags: normalizeTags(input.tags, "tags") };
+  // An empty tag set has no canonical `info.tags` representation in Bruno (its
+  // writer only emits tags when non-empty), so treat an empty list as an
+  // explicit removal instead of serializing `tags: []`.
+  const tags = normalizeTags(input.tags, "tags");
+  return { ...input, tags: tags.length > 0 ? tags : null };
 }
 
 function updateLockedRequest(
