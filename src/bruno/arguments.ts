@@ -15,6 +15,7 @@ import type { Config } from "../config/config.js";
 import { ENVIRONMENTS_DIR, YAML_EXTENSION } from "../opencollection/paths.js";
 import { resolveWithinCollection } from "../security/paths.js";
 import { BrunoMcpError } from "./errors.js";
+import { formatTags } from "./tags.js";
 
 /** JavaScript sandbox modes Bruno v4 exposes for a run. */
 export type SandboxMode = "safe" | "developer";
@@ -73,9 +74,6 @@ const OPTION_PREFIX = "-";
 
 /** Matches a path separator (POSIX or Windows) inside an environment name. */
 const PATH_SEPARATOR = /[\\/]/;
-
-/** Bruno tag filter characters accepted by the app UI and CLI CSV syntax. */
-const TAG_ALLOWED_CHARS = /^[A-Za-z0-9 _-]+$/;
 
 /**
  * Whether `value` contains any C0 control character (U+0000-U+001F) or DEL
@@ -233,50 +231,6 @@ function resolveEnvironmentName(
   return name;
 }
 
-/**
- * Validate a single tag name so it can be safely serialized into Bruno CLI's
- * comma-separated tag filter syntax.
- *
- * @throws {BrunoMcpError} `INVALID_TAG` when the tag is empty or blank, carries
- *   a control character, or contains unsupported punctuation.
- */
-function assertValidTag(tag: string, fieldName: "tags" | "excludeTags"): string {
-  if (hasControlCharacter(tag)) {
-    throw new BrunoMcpError(
-      "INVALID_TAG",
-      `Tag ${JSON.stringify(tag)} in ${fieldName} must not contain control characters.`,
-    );
-  }
-
-  const trimmed = tag.trim();
-  if (trimmed.length === 0) {
-    throw new BrunoMcpError(
-      "INVALID_TAG",
-      `Tag in ${fieldName} must not be empty.`,
-    );
-  }
-
-  if (!TAG_ALLOWED_CHARS.test(trimmed)) {
-    throw new BrunoMcpError(
-      "INVALID_TAG",
-      `Tag ${JSON.stringify(tag)} in ${fieldName} must only contain letters, numbers, spaces, "-", and "_".`,
-    );
-  }
-
-  return trimmed;
-}
-
-/** Format and validate a list of tags into a comma-separated argument string. */
-function formatTags(
-  tags: readonly string[],
-  fieldName: "tags" | "excludeTags",
-): string {
-  const validated: string[] = [];
-  for (const tag of tags) {
-    validated.push(assertValidTag(tag, fieldName));
-  }
-  return validated.join(",");
-}
 
 /**
  * Translate semantic run parameters into the argument array for `bru run`.

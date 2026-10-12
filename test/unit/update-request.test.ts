@@ -187,6 +187,84 @@ describe("updateRequest", () => {
     expect(getRequest(config, requestInput()).revision).toBe(result.revision);
   });
 
+  it("normalizes and patches tags accepted by Bruno UI", () => {
+    const result = updateRequest(
+      config,
+      requestInput({
+        tags: [
+          "  smoke test ",
+          "team_alpha-1",
+          "-Foo",
+          "équipe",
+          "日本語",
+          "тест_1",
+          "smoke test",
+        ],
+      }),
+    );
+
+    expect(result.changed).toBe(true);
+    expect(parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8"))).toMatchObject(
+      {
+        info: {
+          tags: [
+            "smoke test",
+            "team_alpha-1",
+            "-Foo",
+            "équipe",
+            "日本語",
+            "тест_1",
+            "smoke test",
+          ],
+        },
+      },
+    );
+  });
+
+  it.each([
+    ["empty", ""],
+    ["blank", "   "],
+    ["control", "smoke\n"],
+    ["line separator", "smoke\u2028billing"],
+    ["paragraph separator", "smoke\u2029billing"],
+    ["comma", "smoke,billing"],
+    ["slash", "smoke/billing"],
+    ["dot", "slow.flaky"],
+  ])("rejects invalid request tag patch %s", (_description, tag) => {
+    const before = readFileSync(join(root, "api/Request.yml"), "utf8");
+
+    expectErrorCode(
+      () => updateRequest(config, requestInput({ tags: [tag] })),
+      "INVALID_TAG",
+    );
+    expect(readFileSync(join(root, "api/Request.yml"), "utf8")).toBe(before);
+  });
+
+  it("removes tags without validating existing legacy tag values", () => {
+    write(
+      "api/Request.yml",
+      [
+        "info:",
+        "  name: Legacy tags",
+        "  type: http",
+        '  tags: ["slow.flaky"]',
+        "http:",
+        "  method: GET",
+        "  url: /old",
+        "",
+      ].join("\n"),
+    );
+
+    updateRequest(config, requestInput({ tags: null }));
+
+    expect(parseYaml(readFileSync(join(root, "api/Request.yml"), "utf8"))).toEqual(
+      {
+        info: { name: "Legacy tags", type: "http" },
+        http: { method: "GET", url: "/old" },
+      },
+    );
+  });
+
   it("merges runtime, settings, and app patches without deleting siblings", () => {
     const source = [
       "info:",

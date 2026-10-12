@@ -217,8 +217,8 @@ describe("buildRunArgs", () => {
       REPORT_PATH,
     ]);
 
-    expect(build({ tags: ["smoke test", "team_alpha-1", "-Foo"] })).toEqual([
-      "--tags=smoke test,team_alpha-1,-Foo",
+    expect(build({ tags: ["smoke test", "team_alpha-1", "-Foo", "équipe", "日本語"] })).toEqual([
+      "--tags=smoke test,team_alpha-1,-Foo,équipe,日本語",
       "--reporter-json",
       REPORT_PATH,
     ]);
@@ -236,8 +236,8 @@ describe("buildRunArgs", () => {
       REPORT_PATH,
     ]);
 
-    expect(build({ excludeTags: ["slow", "flaky", "-Foo"] })).toEqual([
-      "--exclude-tags=slow,flaky,-Foo",
+    expect(build({ excludeTags: ["slow", "flaky", "-Foo", "тест_1"] })).toEqual([
+      "--exclude-tags=slow,flaky,-Foo,тест_1",
       "--reporter-json",
       REPORT_PATH,
     ]);
@@ -274,6 +274,8 @@ describe("buildRunArgs", () => {
     expectErrorCode(() => build({ tags: ["   "] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke\n"] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke\0"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\u2028billing"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\u2029billing"] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke,billing"] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke/billing"] }), "INVALID_TAG");
 
@@ -282,6 +284,10 @@ describe("buildRunArgs", () => {
     expectErrorCode(() => build({ excludeTags: ["slow\r"] }), "INVALID_TAG");
     expectErrorCode(
       () => build({ excludeTags: ["slow,flaky"] }),
+      "INVALID_TAG",
+    );
+    expectErrorCode(
+      () => build({ excludeTags: ["slow\u2028flaky"] }),
       "INVALID_TAG",
     );
     expectErrorCode(() => build({ excludeTags: ["slow.flaky"] }), "INVALID_TAG");

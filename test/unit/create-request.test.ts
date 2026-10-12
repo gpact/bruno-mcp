@@ -259,6 +259,61 @@ describe("createRequest", () => {
     });
   });
 
+  it("normalizes and serializes tags accepted by Bruno UI", () => {
+    createRequest(
+      config,
+      requestInput({
+        request: "Tags.yml",
+        tags: [
+          "  smoke test ",
+          "team_alpha-1",
+          "-Foo",
+          "équipe",
+          "日本語",
+          "тест_1",
+          "smoke test",
+        ],
+      }),
+    );
+
+    expect(parseYaml(readFileSync(join(root, "api/Tags.yml"), "utf8"))).toMatchObject(
+      {
+        info: {
+          tags: [
+            "smoke test",
+            "team_alpha-1",
+            "-Foo",
+            "équipe",
+            "日本語",
+            "тест_1",
+            "smoke test",
+          ],
+        },
+      },
+    );
+  });
+
+  it.each([
+    ["empty", ""],
+    ["blank", "   "],
+    ["control", "smoke\n"],
+    ["line separator", "smoke\u2028billing"],
+    ["paragraph separator", "smoke\u2029billing"],
+    ["comma", "smoke,billing"],
+    ["slash", "smoke/billing"],
+    ["dot", "slow.flaky"],
+  ])("rejects invalid request tag %s", (_description, tag) => {
+    expectErrorCode(
+      () =>
+        createRequest(
+          config,
+          requestInput({ request: "Invalid.yml", tags: [tag] }),
+        ),
+      "INVALID_TAG",
+    );
+    expect(() => readFileSync(join(root, "api/Invalid.yml"), "utf8")).toThrow();
+  });
+
   it("never overwrites an existing request", () => {
     const original = "info:\n  name: Existing\n  type: http\n";
     write("api/Users/Create User.yml", original);
