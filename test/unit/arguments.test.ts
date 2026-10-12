@@ -216,6 +216,12 @@ describe("buildRunArgs", () => {
       "--reporter-json",
       REPORT_PATH,
     ]);
+
+    expect(build({ tags: ["smoke test", "team_alpha-1", "-Foo"] })).toEqual([
+      "--tags=smoke test,team_alpha-1,-Foo",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
   });
 
   it("omits --tags when tags is empty or omitted", () => {
@@ -230,8 +236,8 @@ describe("buildRunArgs", () => {
       REPORT_PATH,
     ]);
 
-    expect(build({ excludeTags: ["slow", "flaky"] })).toEqual([
-      "--exclude-tags=slow,flaky",
+    expect(build({ excludeTags: ["slow", "flaky", "-Foo"] })).toEqual([
+      "--exclude-tags=slow,flaky,-Foo",
       "--reporter-json",
       REPORT_PATH,
     ]);
@@ -266,14 +272,19 @@ describe("buildRunArgs", () => {
   it("rejects invalid tags", () => {
     expectErrorCode(() => build({ tags: [""] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["   "] }), "INVALID_TAG");
-    expectErrorCode(() => build({ tags: ["-option"] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke\n"] }), "INVALID_TAG");
     expectErrorCode(() => build({ tags: ["smoke\0"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke,billing"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke/billing"] }), "INVALID_TAG");
 
     expectErrorCode(() => build({ excludeTags: [""] }), "INVALID_TAG");
     expectErrorCode(() => build({ excludeTags: ["   "] }), "INVALID_TAG");
-    expectErrorCode(() => build({ excludeTags: ["--flag"] }), "INVALID_TAG");
     expectErrorCode(() => build({ excludeTags: ["slow\r"] }), "INVALID_TAG");
+    expectErrorCode(
+      () => build({ excludeTags: ["slow,flaky"] }),
+      "INVALID_TAG",
+    );
+    expectErrorCode(() => build({ excludeTags: ["slow.flaky"] }), "INVALID_TAG");
   });
 
   it("adds --sandbox developer only for the developer sandbox", () => {

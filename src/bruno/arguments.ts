@@ -74,6 +74,9 @@ const OPTION_PREFIX = "-";
 /** Matches a path separator (POSIX or Windows) inside an environment name. */
 const PATH_SEPARATOR = /[\\/]/;
 
+/** Bruno tag filter characters accepted by the app UI and CLI CSV syntax. */
+const TAG_ALLOWED_CHARS = /^[A-Za-z0-9 _-]+$/;
+
 /**
  * Whether `value` contains any C0 control character (U+0000-U+001F) or DEL
  * (U+007F). Such bytes could break argument framing, smuggle control sequences
@@ -231,11 +234,11 @@ function resolveEnvironmentName(
 }
 
 /**
- * Validate a single tag name so it cannot break argument framing or act as a
- * Bruno CLI option.
+ * Validate a single tag name so it can be safely serialized into Bruno CLI's
+ * comma-separated tag filter syntax.
  *
  * @throws {BrunoMcpError} `INVALID_TAG` when the tag is empty or blank, carries
- *   a control character, or begins with "-".
+ *   a control character, or contains unsupported punctuation.
  */
 function assertValidTag(tag: string, fieldName: "tags" | "excludeTags"): string {
   if (hasControlCharacter(tag)) {
@@ -253,10 +256,10 @@ function assertValidTag(tag: string, fieldName: "tags" | "excludeTags"): string 
     );
   }
 
-  if (trimmed.startsWith(OPTION_PREFIX)) {
+  if (!TAG_ALLOWED_CHARS.test(trimmed)) {
     throw new BrunoMcpError(
       "INVALID_TAG",
-      `Tag ${JSON.stringify(tag)} in ${fieldName} must not begin with "-".`,
+      `Tag ${JSON.stringify(tag)} in ${fieldName} must only contain letters, numbers, spaces, "-", and "_".`,
     );
   }
 
@@ -291,7 +294,7 @@ function formatTags(
  *   control character, or begins with "-" (which Bruno would parse as an
  *   option).
  * @throws {BrunoMcpError} `INVALID_TAG` when a tag in tags or excludeTags is
- *   empty, carries a control character, or begins with "-".
+ *   empty, carries a control character, or contains unsupported punctuation.
  * @throws {BrunoMcpError} `INVALID_ENVIRONMENT_NAME` when the environment
  *   reference is empty, carries a control character, or contains a path
  *   separator or dot segment, or selects a symbolic link.
