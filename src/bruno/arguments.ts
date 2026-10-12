@@ -15,6 +15,7 @@ import type { Config } from "../config/config.js";
 import { ENVIRONMENTS_DIR, YAML_EXTENSION } from "../opencollection/paths.js";
 import { resolveWithinCollection } from "../security/paths.js";
 import { BrunoMcpError } from "./errors.js";
+import { formatTags } from "./tags.js";
 
 /** JavaScript sandbox modes Bruno v4 exposes for a run. */
 export type SandboxMode = "safe" | "developer";
@@ -39,6 +40,10 @@ export interface RunArgsParams {
   testsOnly?: boolean;
   /** Delay between requests, in milliseconds. */
   delayMs?: number;
+  /** Tags to include in the run. */
+  tags?: string[];
+  /** Tags to exclude from the run. */
+  excludeTags?: string[];
   /** Requested JavaScript sandbox. Developer mode must be pre-authorized. */
   sandbox?: SandboxMode;
   /** Allow insecure TLS. Must be pre-authorized. */
@@ -241,6 +246,8 @@ function resolveEnvironmentName(
  * @throws {BrunoMcpError} `INVALID_TARGET` when a target is empty, carries a
  *   control character, or begins with "-" (which Bruno would parse as an
  *   option).
+ * @throws {BrunoMcpError} `INVALID_TAG` when a tag in tags or excludeTags is
+ *   empty, carries a control character, or contains unsupported punctuation.
  * @throws {BrunoMcpError} `INVALID_ENVIRONMENT_NAME` when the environment
  *   reference is empty, carries a control character, or contains a path
  *   separator or dot segment, or selects a symbolic link.
@@ -291,6 +298,20 @@ export function buildRunArgs(
 
   if (params.delayMs !== undefined) {
     args.push("--delay", String(params.delayMs));
+  }
+
+  if (params.tags !== undefined && params.tags.length > 0) {
+    const formatted = formatTags(params.tags, "tags");
+    if (formatted.length > 0) {
+      args.push(`--tags=${formatted}`);
+    }
+  }
+
+  if (params.excludeTags !== undefined && params.excludeTags.length > 0) {
+    const formatted = formatTags(params.excludeTags, "excludeTags");
+    if (formatted.length > 0) {
+      args.push(`--exclude-tags=${formatted}`);
+    }
   }
 
   if (params.sandbox === DEVELOPER_SANDBOX) {

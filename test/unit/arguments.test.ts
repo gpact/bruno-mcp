@@ -198,6 +198,101 @@ describe("buildRunArgs", () => {
     expect(build({})).not.toContain("--delay");
   });
 
+  it("adds bound --tags when tags are provided", () => {
+    expect(build({ tags: ["smoke"] })).toEqual([
+      "--tags=smoke",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+
+    expect(build({ tags: ["smoke", "billing"] })).toEqual([
+      "--tags=smoke,billing",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+
+    expect(build({ tags: ["  smoke ", "billing"] })).toEqual([
+      "--tags=smoke,billing",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+
+    expect(build({ tags: ["smoke test", "team_alpha-1", "-Foo", "équipe", "日本語"] })).toEqual([
+      "--tags=smoke test,team_alpha-1,-Foo,équipe,日本語",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+  });
+
+  it("omits --tags when tags is empty or omitted", () => {
+    expect(build({ tags: [] })).toEqual(["--reporter-json", REPORT_PATH]);
+    expect(build({})).toEqual(["--reporter-json", REPORT_PATH]);
+  });
+
+  it("adds bound --exclude-tags when excludeTags are provided", () => {
+    expect(build({ excludeTags: ["slow"] })).toEqual([
+      "--exclude-tags=slow",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+
+    expect(build({ excludeTags: ["slow", "flaky", "-Foo", "тест_1"] })).toEqual([
+      "--exclude-tags=slow,flaky,-Foo,тест_1",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+  });
+
+  it("omits --exclude-tags when excludeTags is empty or omitted", () => {
+    expect(build({ excludeTags: [] })).toEqual([
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+    expect(build({})).toEqual(["--reporter-json", REPORT_PATH]);
+  });
+
+  it("combines tags and excludeTags in expected order", () => {
+    const args = build({
+      targets: ["Hotel/Search.yml"],
+      environment: "Local",
+      tags: ["smoke", "v1"],
+      excludeTags: ["slow"],
+    });
+
+    expect(args).toEqual([
+      "Hotel/Search.yml",
+      "--env=Local",
+      "--tags=smoke,v1",
+      "--exclude-tags=slow",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+  });
+
+  it("rejects invalid tags", () => {
+    expectErrorCode(() => build({ tags: [""] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["   "] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\n"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\0"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\u2028billing"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke\u2029billing"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke,billing"] }), "INVALID_TAG");
+    expectErrorCode(() => build({ tags: ["smoke/billing"] }), "INVALID_TAG");
+
+    expectErrorCode(() => build({ excludeTags: [""] }), "INVALID_TAG");
+    expectErrorCode(() => build({ excludeTags: ["   "] }), "INVALID_TAG");
+    expectErrorCode(() => build({ excludeTags: ["slow\r"] }), "INVALID_TAG");
+    expectErrorCode(
+      () => build({ excludeTags: ["slow,flaky"] }),
+      "INVALID_TAG",
+    );
+    expectErrorCode(
+      () => build({ excludeTags: ["slow\u2028flaky"] }),
+      "INVALID_TAG",
+    );
+    expectErrorCode(() => build({ excludeTags: ["slow.flaky"] }), "INVALID_TAG");
+  });
+
   it("adds --sandbox developer only for the developer sandbox", () => {
     expect(build({ sandbox: "developer" })).toEqual([
       "--sandbox",

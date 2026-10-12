@@ -52,6 +52,14 @@ export const runInputSchema = z.object({
     .min(0)
     .optional()
     .describe("Delay between requests in milliseconds."),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe("Tags to include."),
+  excludeTags: z
+    .array(z.string())
+    .optional()
+    .describe("Tags to exclude."),
   sandbox: z
     .enum(["safe", "developer"])
     .default("safe")
@@ -130,6 +138,8 @@ export async function handleRun(
       : { environment: input.environment }),
     ...(input.variables === undefined ? {} : { variables: input.variables }),
     ...(input.delayMs === undefined ? {} : { delayMs: input.delayMs }),
+    ...(input.tags === undefined ? {} : { tags: input.tags }),
+    ...(input.excludeTags === undefined ? {} : { excludeTags: input.excludeTags }),
   };
   const runProcess = dependencies.runProcess ?? runBruProcess;
   const processResult = await runProcess({

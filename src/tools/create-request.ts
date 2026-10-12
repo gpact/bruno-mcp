@@ -19,6 +19,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { BrunoMcpError } from "../bruno/errors.js";
+import { normalizeTags } from "../bruno/tags.js";
 import type { Config } from "../config/config.js";
 import { resolveCollection } from "../opencollection/collection.js";
 import { stringifyYaml } from "../opencollection/parser.js";
@@ -224,7 +225,8 @@ export function createRequest(
   }
   assertOutsideNestedCollection(collectionRoot, target, input.request);
 
-  const document = buildRequestDocument(input);
+  const normalizedInput = normalizeCreateRequestInput(input);
+  const document = buildRequestDocument(normalizedInput);
   const source = stringifyYaml(document);
   createParentDirectories(collectionRoot, input.request);
   assertNoSymlinks(collectionRoot, input.request);
@@ -299,6 +301,16 @@ export function registerCreateRequest(server: McpServer, config: Config): void {
   );
 }
 
+function normalizeCreateRequestInput(
+  input: CreateRequestInput,
+): CreateRequestInput {
+  if (input.tags === undefined) {
+    return input;
+  }
+
+  return { ...input, tags: normalizeTags(input.tags, "tags") };
+}
+
 function buildRequestDocument(
   input: CreateRequestInput,
 ): Record<string, unknown> {
@@ -307,7 +319,7 @@ function buildRequestDocument(
     type: "http",
   };
   if (input.sequence !== undefined) info.seq = input.sequence;
-  if (input.tags !== undefined) info.tags = input.tags;
+  if (input.tags !== undefined && input.tags.length > 0) info.tags = input.tags;
   if (input.description !== undefined) info.description = input.description;
 
   const http: Record<string, unknown> = {

@@ -92,6 +92,32 @@ describe("runInputSchema", () => {
         maxResponseBodyBytes: 0,
       }),
     ).toThrow();
+    expect(() =>
+      runInputSchema.parse({
+        collection: "example",
+        tags: "not-an-array",
+      }),
+    ).toThrow();
+    expect(() =>
+      runInputSchema.parse({
+        collection: "example",
+        excludeTags: [123],
+      }),
+    ).toThrow();
+  });
+
+  it("accepts valid tags and excludeTags", () => {
+    expect(
+      runInputSchema.parse({
+        collection: "example",
+        tags: ["smoke", "v1"],
+        excludeTags: ["slow"],
+      }),
+    ).toMatchObject({
+      collection: "example",
+      tags: ["smoke", "v1"],
+      excludeTags: ["slow"],
+    });
   });
 });
 
@@ -190,6 +216,34 @@ describe("handleRun execution", () => {
     });
     expect(result.content[0]).toMatchObject({ type: "text" });
     expect(JSON.stringify(result)).not.toContain("private-token");
+  });
+
+  it("forwards tags and excludeTags to argument builder", async () => {
+    const calls: RunProcessOptions[] = [];
+    const runProcess: RunProcess = async (options) => {
+      calls.push(options);
+      return processResult({
+        reportRaw: reportWithBody({ ok: true }),
+      });
+    };
+
+    await handleRun(
+      baseConfig,
+      input({
+        tags: ["smoke", "v1"],
+        excludeTags: ["slow"],
+      }),
+      { runProcess },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.buildArgs("/tmp/report.json")).toEqual([
+      "run",
+      "--tags=smoke,v1",
+      "--exclude-tags=slow",
+      "--reporter-json",
+      "/tmp/report.json",
+    ]);
   });
 
   it("keeps exit code 1 as an inspectable non-error result", async () => {

@@ -274,9 +274,11 @@ Optional inputs cover the full Bruno v4 HTTP request representation:
 
 Supported bodies include raw JSON, text, XML, and SPARQL content, URL-encoded
 forms, multipart forms, and files. A request may provide one body or named body
-variants. Authentication supports Bruno's OpenCollection auth types and Bruno's
-Akamai EdgeGrid extension. The advertised MCP input schema describes each nested
-field and validates incompatible variants. Request YAML is serialized and written
+variants. Request tags may contain only Unicode letters, numbers, spaces, `-`, and `_`;
+duplicate tags are dropped and an empty list is omitted.
+Authentication supports Bruno's OpenCollection auth types and Bruno's Akamai
+EdgeGrid extension. The advertised MCP input schema describes each nested field
+and validates incompatible variants. Request YAML is serialized and written
 directly; Bruno CLI is not used for file creation.
 
 The path must not target collection metadata, the root `environments` directory,
@@ -307,7 +309,8 @@ mapping.
 
 All other supplied fields replace their whole value. This includes `auth`,
 `body`, structured descriptions, `tags`, `headers`, `params`, and `examples`.
-Individual array-entry operations are not supported. `name`, `method`, and `url`
+Supplying an empty `tags` list clears all tags, the same as `null`; duplicate
+tags are dropped. Individual array-entry operations are not supported. `name`, `method`, and `url`
 accept only concrete non-blank replacements; `null` removes any other optional
 top-level field. A field cannot be removed when doing so would leave an alias
 without its YAML anchor; that patch is rejected as an invalid mutation target.
@@ -426,6 +429,8 @@ Inputs:
 | `bail` | `false` | Stops after the first failing request, test, or assertion. |
 | `testsOnly` | `false` | Runs only requests that contain tests or active assertions. |
 | `delayMs` | None | Non-negative delay between requests in milliseconds. |
+| `tags` | None | Tags to include in the run. Each tag may contain only Unicode letters, numbers, spaces, `-`, and `_`. |
+| `excludeTags` | None | Tags to exclude from the run. Each tag may contain only Unicode letters, numbers, spaces, `-`, and `_`. |
 | `sandbox` | `safe` | Bruno sandbox mode: `safe` or `developer`. |
 | `insecure` | `false` | Requests disabled TLS certificate verification. |
 | `responseBodyMode` | `onFailure` | Returned response bodies: `none`, `onFailure`, or `full`. |

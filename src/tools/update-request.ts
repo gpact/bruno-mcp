@@ -21,6 +21,7 @@ import { isCollection, isMap, isNode, isScalar } from "yaml";
 import { z } from "zod";
 
 import { BrunoMcpError } from "../bruno/errors.js";
+import { normalizeTags } from "../bruno/tags.js";
 import type { Config } from "../config/config.js";
 import { logger } from "../logger.js";
 import { resolveCollection } from "../opencollection/collection.js";
@@ -202,12 +203,31 @@ export function updateRequest(
   input: UpdateRequestInput,
 ): UpdateRequestOutput {
   const resolved = resolveMutationTarget(config, input);
-  const lock = acquireRequestLock(resolved.collectionRoot, resolved.path, input);
+  const normalizedInput = normalizeUpdateRequestInput(input);
+  const lock = acquireRequestLock(
+    resolved.collectionRoot,
+    resolved.path,
+    normalizedInput,
+  );
   try {
-    return updateLockedRequest(config, input, resolved);
+    return updateLockedRequest(config, normalizedInput, resolved);
   } finally {
     releaseRequestLock(lock);
   }
+}
+
+function normalizeUpdateRequestInput(
+  input: UpdateRequestInput,
+): UpdateRequestInput {
+  if (input.tags === undefined || input.tags === null) {
+    return input;
+  }
+
+  // An empty tag set has no canonical `info.tags` representation in Bruno (its
+  // writer only emits tags when non-empty), so treat an empty list as an
+  // explicit removal instead of serializing `tags: []`.
+  const tags = normalizeTags(input.tags, "tags");
+  return { ...input, tags: tags.length > 0 ? tags : null };
 }
 
 function updateLockedRequest(
