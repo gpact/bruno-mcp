@@ -140,6 +140,9 @@ export async function handleRun(
     ...(input.delayMs === undefined ? {} : { delayMs: input.delayMs }),
     ...(input.tags === undefined ? {} : { tags: input.tags }),
     ...(input.excludeTags === undefined ? {} : { excludeTags: input.excludeTags }),
+    ...(input.responseBodyMode === "none"
+      ? { skipResponseBody: true }
+      : {}),
   };
   const runProcess = dependencies.runProcess ?? runBruProcess;
   const processResult = await runProcess({

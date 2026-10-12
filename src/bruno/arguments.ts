@@ -48,6 +48,8 @@ export interface RunArgsParams {
   sandbox?: SandboxMode;
   /** Allow insecure TLS. Must be pre-authorized. */
   insecure?: boolean;
+  /** Ask Bruno's reporter to omit response bodies before writing JSON output. */
+  skipResponseBody?: boolean;
 }
 
 /** Ambient inputs the builder needs beyond the semantic parameters. */
@@ -320,6 +322,10 @@ export function buildRunArgs(
 
   if (params.insecure) {
     args.push("--insecure");
+  }
+
+  if (params.skipResponseBody) {
+    args.push("--reporter-skip-response-body");
   }
 
   args.push("--reporter-json", context.reportPath);

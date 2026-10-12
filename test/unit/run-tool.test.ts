@@ -317,6 +317,40 @@ describe("handleRun execution", () => {
     ).toEqual({ status: 200 });
   });
 
+  it("asks Bruno to omit reporter response bodies for none mode", async () => {
+    const calls: RunProcessOptions[] = [];
+    const runProcess: RunProcess = async (options) => {
+      calls.push(options);
+      return processResult({
+        reportRaw: JSON.stringify([
+          {
+            results: [
+              {
+                path: "Failure.yml",
+                response: { status: 200 },
+                assertionResults: [{ status: "fail" }],
+              },
+            ],
+          },
+        ]),
+      });
+    };
+
+    await handleRun(
+      baseConfig,
+      input({ responseBodyMode: "none" }),
+      { runProcess },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.buildArgs("/tmp/report.json")).toEqual([
+      "run",
+      "--reporter-skip-response-body",
+      "--reporter-json",
+      "/tmp/report.json",
+    ]);
+  });
+
   it("supports suppressing failed bodies and limiting full output", async () => {
     const runProcess: RunProcess = async () =>
       processResult({

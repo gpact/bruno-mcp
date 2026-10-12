@@ -333,6 +333,14 @@ describe("buildRunArgs", () => {
     ]);
   });
 
+  it("adds --reporter-skip-response-body when requested", () => {
+    expect(build({ skipResponseBody: true })).toEqual([
+      "--reporter-skip-response-body",
+      "--reporter-json",
+      REPORT_PATH,
+    ]);
+  });
+
   it("always appends --reporter-json with the report path last", () => {
     const args = build({
       targets: ["Hotel"],
